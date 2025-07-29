@@ -6,6 +6,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import TodoDemo from "./pages/TodoDemo";
+import Tasks from "./pages/Tasks";
+import Files from "./pages/Files";
+import Analytics from "./pages/Analytics";
+import Notes from "./pages/Notes";
 import DashboardLayout from "./layouts/DashboardLayout";
 import NotFound from "./pages/NotFound";
 
@@ -21,6 +25,10 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/dashboard" element={<DashboardLayout><Dashboard /></DashboardLayout>} />
           <Route path="/todo-demo" element={<DashboardLayout><TodoDemo /></DashboardLayout>} />
+          <Route path="/tasks" element={<DashboardLayout><Tasks /></DashboardLayout>} />
+          <Route path="/files" element={<DashboardLayout><Files /></DashboardLayout>} />
+          <Route path="/analytics" element={<DashboardLayout><Analytics /></DashboardLayout>} />
+          <Route path="/notes" element={<DashboardLayout><Notes /></DashboardLayout>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
