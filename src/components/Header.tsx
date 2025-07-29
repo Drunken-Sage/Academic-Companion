@@ -15,32 +15,7 @@ const Header = () => {
               AcademicCompanion
             </Link>
           </div>
-          <div className="-mr-2 -my-2 md:hidden">
-            <Button
-              variant="ghost"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md"
-            >
-              {isMenuOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
-            </Button>
-          </div>
-          
-          <nav className="hidden md:flex space-x-10">
-            <a href="#features" className="text-base font-medium text-foreground hover:text-primary transition-colors">
-              Features
-            </a>
-            <a href="#about" className="text-base font-medium text-foreground hover:text-primary transition-colors">
-              About
-            </a>
-            <a href="#contact" className="text-base font-medium text-foreground hover:text-primary transition-colors">
-              Contact
-            </a>
-          </nav>
-          
+
           <div className="hidden md:flex items-center justify-end md:flex-1 lg:w-0 space-x-4">
             <Link to="/dashboard">
               <Button variant="outline" size="sm">

@@ -36,7 +36,7 @@ const Hero = () => {
           <div className="relative overflow-hidden rounded-2xl shadow-card bg-gradient-card border border-border/50">
             <img
               src={heroImage}
-              alt="StudyFlow Dashboard Preview"
+              alt="Academic Companion Preview"
               className="w-full h-auto"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent" />
