@@ -15,14 +15,14 @@ const Features = () => {
       icon: CheckSquare,
       title: "Calendar-Integrated To-Do Lists",
       description: "Manage your academic tasks with calendar integration, smart prioritization, and deadline tracking.",
-      color: "todo",
+      color: "red-500",
       features: ["Calendar integration", "Smart prioritization", "Deadline alerts", "Progress tracking"]
     },
     {
       icon: BarChart3,
       title: "Academic Analytics",
       description: "Track your productivity, study patterns, and academic progress with detailed insights and reports.",
-      color: "accent",
+      color: "blue-500",
       features: ["Study time tracking", "Performance insights", "Habit analysis", "Progress reports"]
     }
   ];
@@ -71,18 +71,6 @@ const Features = () => {
                     </li>
                   ))}
                 </ul>
-                <Button 
-                  variant={feature.color as any} 
-                  size="sm" 
-                  className="w-full"
-                  onClick={() => {
-                    if (feature.title.includes("To-Do")) {
-                      window.location.href = "/todo-demo";
-                    }
-                  }}
-                >
-                  {feature.title.includes("To-Do") ? "Try Demo" : "Learn More"}
-                </Button>
               </CardContent>
             </Card>
           ))}

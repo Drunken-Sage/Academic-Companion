@@ -29,10 +29,6 @@ const Hero = () => {
             Start Your Journey
             <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
           </Button>
-          <Button variant="outline" size="xl" className="group">
-            <Play className="mr-2 h-5 w-5" />
-            Watch Demo
-          </Button>
         </div>
 
         {/* Hero Image */}
