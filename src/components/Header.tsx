@@ -23,9 +23,11 @@ const Header = () => {
                 Dashboard
               </Button>
             </Link>
-            <Button variant="hero" size="sm">
-              Get Started
-            </Button>
+            <Link to="/auth">
+              <Button variant="hero" size="sm">
+                Sign In
+              </Button>
+            </Link>
           </div>
         </div>
         
