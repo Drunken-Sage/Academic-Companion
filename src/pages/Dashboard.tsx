@@ -1,10 +1,14 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isToday } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { User, Session } from '@supabase/supabase-js';
 import { 
   LayoutDashboard,
   CheckCircle2, 
@@ -18,7 +22,8 @@ import {
   Users,
   Award,
   Activity,
-  BarChart3
+  BarChart3,
+  LogOut
 } from "lucide-react";
 
 interface Task {
@@ -37,8 +42,22 @@ interface StudySession {
   date: Date;
 }
 
+interface Profile {
+  id: string;
+  user_id: string;
+  display_name: string | null;
+  major: string | null;
+}
+
 const Dashboard = () => {
-  // Mock data
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Mock data - in a real app, this would come from your database
   const [tasks] = useState<Task[]>([
     {
       id: '1',
@@ -81,6 +100,142 @@ const Dashboard = () => {
     { id: '4', subject: 'History', duration: 60, date: new Date(2024, 11, 22) },
   ]);
 
+  useEffect(() => {
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (!session?.user) {
+          navigate('/auth');
+        } else {
+          // Fetch user profile after authentication
+          setTimeout(() => {
+            fetchUserProfile(session.user.id);
+          }, 0);
+        }
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (!session?.user) {
+        navigate('/auth');
+      } else {
+        fetchUserProfile(session.user.id);
+      }
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        // If profile doesn't exist, create one
+        if (error.code === 'PGRST116') {
+          await createUserProfile(userId);
+        }
+      } else {
+        setProfile(data);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const createUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            user_id: userId,
+            display_name: user?.email || 'Student',
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating profile:', error);
+      } else {
+        setProfile(data);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        toast({
+          title: "Error signing out",
+          description: error.message,
+          variant: "destructive"
+        });
+      } else {
+        navigate('/');
+      }
+    } catch (error) {
+      toast({
+        title: "An error occurred",
+        description: "Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleQuickAction = (action: string) => {
+    switch (action) {
+      case 'add-task':
+        navigate('/tasks');
+        toast({
+          title: "Add New Task",
+          description: "Redirecting to tasks page...",
+        });
+        break;
+      case 'start-session':
+        toast({
+          title: "Study Session Started",
+          description: "Timer started! Focus mode activated.",
+        });
+        break;
+      case 'create-note':
+        navigate('/notes');
+        toast({
+          title: "Create Note",
+          description: "Redirecting to notes page...",
+        });
+        break;
+      case 'schedule-event':
+        toast({
+          title: "Schedule Event",
+          description: "Calendar feature coming soon!",
+        });
+        break;
+      default:
+        toast({
+          title: "Feature",
+          description: "This feature is being developed.",
+        });
+    }
+  };
+
   const weekDays = useMemo(() => {
     const start = startOfWeek(new Date());
     const end = endOfWeek(new Date());
@@ -105,6 +260,21 @@ const Dashboard = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-card flex items-center justify-center">
+        <div className="text-center">
+          <BookOpen className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p>Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null; // Will redirect to auth
+  }
+
   return (
     <div className="min-h-screen bg-gradient-card">
       <div className="container py-8 space-y-8">
@@ -116,16 +286,22 @@ const Dashboard = () => {
               Welcome back! Here's your academic progress overview.
             </p>
           </div>
-          <div className="flex items-center space-x-2">
-            <Avatar>
-              <AvatarFallback className="bg-primary text-primary-foreground">
-                JS
-              </AvatarFallback>
-            </Avatar>
-            <div className="text-sm">
-              <p className="font-medium">John Student</p>
-              <p className="text-muted-foreground">Computer Science</p>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Avatar>
+                <AvatarFallback className="bg-primary text-primary-foreground">
+                  {profile?.display_name ? profile.display_name.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="text-sm">
+                <p className="font-medium">{profile?.display_name || user.email}</p>
+                <p className="text-muted-foreground">{profile?.major || 'Student'}</p>
+              </div>
             </div>
+            <Button variant="outline" size="sm" onClick={handleSignOut}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </Button>
           </div>
         </div>
 
@@ -247,19 +423,35 @@ const Dashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button variant="outline" className="w-full justify-start">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => handleQuickAction('add-task')}
+              >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 Add New Task
               </Button>
-              <Button variant="outline" className="w-full justify-start">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => handleQuickAction('start-session')}
+              >
                 <Clock className="h-4 w-4 mr-2" />
                 Start Study Session
               </Button>
-              <Button variant="outline" className="w-full justify-start">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => handleQuickAction('create-note')}
+              >
                 <FileText className="h-4 w-4 mr-2" />
                 Create Note
               </Button>
-              <Button variant="outline" className="w-full justify-start">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => handleQuickAction('schedule-event')}
+              >
                 <Calendar className="h-4 w-4 mr-2" />
                 Schedule Event
               </Button>
