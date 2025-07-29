@@ -30,7 +30,7 @@ const Footer = () => {
 
   return (
     <footer className="bg-background border-t border-border/40">
-      <div className="container py-16">
+      <div className="container py-8">
         <div className="grid grid-cols-2 md:grid-cols-6 gap-8">
           {/* Brand */}
           <div className="col-span-2 space-y-4">
@@ -49,62 +49,9 @@ const Footer = () => {
               <Linkedin className="h-5 w-5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors" />
             </div>
           </div>
-
-          {/* Links */}
-          <div className="space-y-4">
-            <h4 className="font-semibold">Product</h4>
-            <ul className="space-y-2">
-              {links.product.map((link) => (
-                <li key={link.name}>
-                  <a href={link.href} className="text-muted-foreground hover:text-foreground transition-colors text-sm">
-                    {link.name}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="space-y-4">
-            <h4 className="font-semibold">Company</h4>
-            <ul className="space-y-2">
-              {links.company.map((link) => (
-                <li key={link.name}>
-                  <a href={link.href} className="text-muted-foreground hover:text-foreground transition-colors text-sm">
-                    {link.name}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="space-y-4">
-            <h4 className="font-semibold">Resources</h4>
-            <ul className="space-y-2">
-              {links.resources.map((link) => (
-                <li key={link.name}>
-                  <a href={link.href} className="text-muted-foreground hover:text-foreground transition-colors text-sm">
-                    {link.name}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="space-y-4">
-            <h4 className="font-semibold">Legal</h4>
-            <ul className="space-y-2">
-              {links.legal.map((link) => (
-                <li key={link.name}>
-                  <a href={link.href} className="text-muted-foreground hover:text-foreground transition-colors text-sm">
-                    {link.name}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
 
-        <div className="border-t border-border/40 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
+        <div className="border-border/40 mt-2 flex flex-col md:flex-row justify-between items-center">
           <p className="text-muted-foreground text-sm">
             © 2024 StudyFlow. All rights reserved.
           </p>

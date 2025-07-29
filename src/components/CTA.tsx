@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Star } from "lucide-react";
 
-const CTA = () => {
+function CTA(){
   return (
     <section className="py-24 relative overflow-hidden">
       {/* Background gradient */}
@@ -14,7 +14,7 @@ const CTA = () => {
             <Star key={i} className="h-5 w-5 fill-current" />
           ))}
           <span className="ml-2 text-sm text-muted-foreground">
-            Trusted by 10,000+ students worldwide
+            Built for students, by students — and it shows
           </span>
         </div>
 
@@ -26,23 +26,10 @@ const CTA = () => {
             </span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Join thousands of students who have already enhanced their productivity and organization with StudyFlow.
+            Join thousands of students who have already enhanced their productivity and organization.
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <Button variant="hero" size="xl" className="group">
-            Get Started for Free
-            <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-          </Button>
-          <Button variant="outline" size="xl">
-            Schedule a Demo
-          </Button>
-        </div>
-
-        <p className="text-sm text-muted-foreground">
-          No credit card required • 14-day free trial • Cancel anytime
-        </p>
       </div>
 
       {/* Decorative elements */}

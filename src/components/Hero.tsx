@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play } from "lucide-react";
-import heroImage from "@/assets/hero-image.jpg";
+import heroImage from "@/assets/image.png";
 
 const Hero = () => {
   return (
@@ -38,9 +38,9 @@ const Hero = () => {
         {/* Hero Image */}
         <div className="relative mt-16 mx-auto max-w-5xl">
           <div className="relative overflow-hidden rounded-2xl shadow-card bg-gradient-card border border-border/50">
-            <img 
-              src={heroImage} 
-              alt="StudyFlow Dashboard Preview" 
+            <img
+              src={heroImage}
+              alt="StudyFlow Dashboard Preview"
               className="w-full h-auto"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent" />

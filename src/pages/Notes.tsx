@@ -54,7 +54,7 @@ const mockNotes: Note[] = [
   }
 ];
 
-const subjects = ['All', 'Physics', 'Mathematics', 'History', 'Chemistry', 'English'];
+const subjects = ['All', 'Database Systems', 'Mathematics', 'History', 'Chemistry', 'English'];
 
 const Notes = () => {
   const [notes, setNotes] = useState<Note[]>(mockNotes);

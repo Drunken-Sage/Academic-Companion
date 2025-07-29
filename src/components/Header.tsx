@@ -15,7 +15,6 @@ const Header = () => {
               AcademicCompanion
             </Link>
           </div>
-          
           <div className="-mr-2 -my-2 md:hidden">
             <Button
               variant="ghost"
