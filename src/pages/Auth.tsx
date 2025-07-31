@@ -26,12 +26,22 @@ const Auth = () => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log('Auth state change:', event, session);
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Redirect authenticated users to dashboard
-        if (session?.user) {
+        // Handle different auth events
+        if (event === 'SIGNED_IN' && session?.user) {
+          toast({
+            title: "Welcome!",
+            description: "You have successfully signed in.",
+          });
           navigate('/dashboard');
+        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+          // User session was refreshed, redirect to dashboard if not already there
+          if (window.location.pathname === '/auth') {
+            navigate('/dashboard');
+          }
         }
       }
     );
@@ -47,14 +57,14 @@ const Auth = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, toast]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const redirectUrl = `${window.location.origin}/`;
+      const redirectUrl = `${window.location.origin}/auth`;
       
       const { error } = await supabase.auth.signUp({
         email,
@@ -85,7 +95,7 @@ const Auth = () => {
       } else {
         toast({
           title: "Check your email",
-          description: "We've sent you a confirmation link to complete your registration.",
+          description: "We've sent you a confirmation link. Click the link in your email to complete your registration and you'll be automatically signed in.",
         });
       }
     } catch (error) {

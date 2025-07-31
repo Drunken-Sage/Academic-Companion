@@ -1,4 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { User } from '@supabase/supabase-js';
 import { Plus, Search, Filter, Edit, Trash2, CheckCircle, Clock, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,44 +25,13 @@ interface Task {
   createdAt: string;
 }
 
-const mockTasks: Task[] = [
-  {
-    id: '1',
-    title: 'Complete Physics Assignment',
-    description: 'Solve problems 1-15 from Chapter 8',
-    subject: 'Physics',
-    status: 'pending',
-    priority: 'high',
-    dueDate: '2024-02-15',
-    createdAt: '2024-01-20'
-  },
-  {
-    id: '2',
-    title: 'Math Quiz Preparation',
-    description: 'Review calculus formulas and practice derivatives',
-    subject: 'Mathematics',
-    status: 'in-progress',
-    priority: 'medium',
-    dueDate: '2024-02-10',
-    createdAt: '2024-01-18'
-  },
-  {
-    id: '3',
-    title: 'History Essay Draft',
-    description: 'Write first draft of WWI impact essay',
-    subject: 'History',
-    status: 'completed',
-    priority: 'low',
-    dueDate: '2024-02-05',
-    createdAt: '2024-01-15'
-  }
-];
-
-const subjects = ['All', 'Physics', 'Mathematics', 'History', 'Chemistry', 'English'];
+const subjects = ['All', 'Physics', 'Mathematics', 'History', 'Chemistry', 'English', 'Computer Science', 'Biology'];
 const priorities = ['All', 'low', 'medium', 'high'];
 
 const Tasks = () => {
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [user, setUser] = useState<User | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('All');
   const [selectedPriority, setSelectedPriority] = useState('All');
@@ -70,6 +43,73 @@ const Tasks = () => {
     priority: 'medium' as Task['priority'],
     dueDate: ''
   });
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // Check authentication and fetch tasks
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
+        navigate('/auth');
+        return;
+      }
+      
+      setUser(session.user);
+      await fetchTasks(session.user.id);
+      setLoading(false);
+    };
+
+    checkAuth();
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!session?.user) {
+          navigate('/auth');
+        } else {
+          setUser(session.user);
+          await fetchTasks(session.user.id);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const fetchTasks = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching tasks:', error);
+        toast({
+          title: "Error fetching tasks",
+          description: error.message,
+          variant: "destructive"
+        });
+      } else {
+        const formattedTasks: Task[] = data.map(task => ({
+          id: task.id,
+          title: task.title,
+          description: task.description || '',
+          subject: task.subject,
+          status: task.status as Task['status'],
+          priority: task.priority as Task['priority'],
+          dueDate: task.due_date,
+          createdAt: new Date(task.created_at).toISOString().split('T')[0]
+        }));
+        setTasks(formattedTasks);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
 
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -102,35 +142,120 @@ const Tasks = () => {
     }
   };
 
-  const toggleTaskStatus = (taskId: string) => {
-    setTasks(prev => prev.map(task => {
-      if (task.id === taskId) {
-        const statusOrder: Task['status'][] = ['pending', 'in-progress', 'completed'];
-        const currentIndex = statusOrder.indexOf(task.status);
-        const nextStatus = statusOrder[(currentIndex + 1) % statusOrder.length];
-        return { ...task, status: nextStatus };
+  const toggleTaskStatus = async (taskId: string) => {
+    if (!user) return;
+
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const statusOrder: Task['status'][] = ['pending', 'in-progress', 'completed'];
+    const currentIndex = statusOrder.indexOf(task.status);
+    const nextStatus = statusOrder[(currentIndex + 1) % statusOrder.length];
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: nextStatus })
+        .eq('id', taskId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        toast({
+          title: "Error updating task",
+          description: error.message,
+          variant: "destructive"
+        });
+      } else {
+        setTasks(prev => prev.map(t => 
+          t.id === taskId ? { ...t, status: nextStatus } : t
+        ));
+        toast({
+          title: "Task updated",
+          description: `Task marked as ${nextStatus.replace('-', ' ')}.`,
+        });
       }
-      return task;
-    }));
+    } catch (error) {
+      console.error('Error updating task:', error);
+    }
   };
 
-  const deleteTask = (taskId: string) => {
-    setTasks(prev => prev.filter(task => task.id !== taskId));
+  const deleteTask = async (taskId: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', taskId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        toast({
+          title: "Error deleting task",
+          description: error.message,
+          variant: "destructive"
+        });
+      } else {
+        setTasks(prev => prev.filter(task => task.id !== taskId));
+        toast({
+          title: "Task deleted",
+          description: "Task has been successfully deleted.",
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error);
+    }
   };
 
-  const addTask = () => {
-    if (!newTask.title || !newTask.subject || !newTask.dueDate) return;
+  const addTask = async () => {
+    if (!newTask.title || !newTask.subject || !newTask.dueDate || !user) return;
     
-    const task: Task = {
-      id: Date.now().toString(),
-      ...newTask,
-      status: 'pending',
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-    
-    setTasks(prev => [...prev, task]);
-    setNewTask({ title: '', description: '', subject: '', priority: 'medium', dueDate: '' });
-    setIsDialogOpen(false);
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .insert([
+          {
+            user_id: user.id,
+            title: newTask.title,
+            description: newTask.description,
+            subject: newTask.subject,
+            priority: newTask.priority,
+            due_date: newTask.dueDate,
+            status: 'pending'
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        toast({
+          title: "Error creating task",
+          description: error.message,
+          variant: "destructive"
+        });
+      } else {
+        const formattedTask: Task = {
+          id: data.id,
+          title: data.title,
+          description: data.description || '',
+          subject: data.subject,
+          status: data.status as Task['status'],
+          priority: data.priority as Task['priority'],
+          dueDate: data.due_date,
+          createdAt: new Date(data.created_at).toISOString().split('T')[0]
+        };
+        
+        setTasks(prev => [formattedTask, ...prev]);
+        setNewTask({ title: '', description: '', subject: '', priority: 'medium', dueDate: '' });
+        setIsDialogOpen(false);
+        toast({
+          title: "Task created",
+          description: "Your new task has been added successfully.",
+        });
+      }
+    } catch (error) {
+      console.error('Error creating task:', error);
+    }
   };
 
   const TaskCard = ({ task }: { task: Task }) => (
@@ -166,6 +291,21 @@ const Tasks = () => {
       </CardContent>
     </Card>
   );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-card flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin mx-auto mb-4 border-4 border-primary border-t-transparent rounded-full" />
+          <p>Loading your tasks...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null; // Will redirect to auth
+  }
 
   return (
     <div className="p-6">
