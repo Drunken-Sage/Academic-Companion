@@ -1,4 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { User } from '@supabase/supabase-js';
 import { Plus, Search, BookOpen, Edit, Trash2, Save, Tag, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,43 +25,12 @@ interface Note {
   wordCount: number;
 }
 
-const mockNotes: Note[] = [
-  {
-    id: '1',
-    title: 'Newton\'s Laws of Motion',
-    content: 'First Law: An object at rest stays at rest and an object in motion stays in motion with the same speed and in the same direction unless acted upon by an unbalanced force.\n\nSecond Law: The acceleration of an object is directly proportional to the net force acting on it and inversely proportional to its mass. F = ma\n\nThird Law: For every action, there is an equal and opposite reaction.',
-    subject: 'Physics',
-    tags: ['mechanics', 'fundamental-laws', 'newton'],
-    createdAt: '2024-01-20',
-    updatedAt: '2024-01-22',
-    wordCount: 89
-  },
-  {
-    id: '2',
-    title: 'Calculus - Derivatives',
-    content: 'A derivative represents the rate of change of a function with respect to a variable.\n\nBasic Rules:\n- Power Rule: d/dx[x^n] = nx^(n-1)\n- Product Rule: d/dx[uv] = u\'v + uv\'\n- Chain Rule: d/dx[f(g(x))] = f\'(g(x)) × g\'(x)\n\nApplications:\n- Finding slopes of tangent lines\n- Optimization problems\n- Related rates',
-    subject: 'Mathematics',
-    tags: ['calculus', 'derivatives', 'formulas'],
-    createdAt: '2024-01-18',
-    updatedAt: '2024-01-18',
-    wordCount: 78
-  },
-  {
-    id: '3',
-    title: 'World War I Causes',
-    content: 'The main causes of World War I can be remembered using the acronym MAIN:\n\nM - Militarism: Arms race between European powers\nA - Alliances: Complex web of military alliances\nI - Imperialism: Competition for colonies\nN - Nationalism: Rising nationalist movements\n\nThe immediate trigger was the assassination of Archduke Franz Ferdinand in Sarajevo on June 28, 1914.',
-    subject: 'History',
-    tags: ['WWI', 'causes', 'MAIN', 'archduke'],
-    createdAt: '2024-01-15',
-    updatedAt: '2024-01-16',
-    wordCount: 95
-  }
-];
-
-const subjects = ['All', 'Database Systems', 'Mathematics', 'History', 'Chemistry', 'English'];
+const subjects = ['All', 'Physics', 'Mathematics', 'History', 'Chemistry', 'English', 'Computer Science', 'Biology'];
 
 const Notes = () => {
-  const [notes, setNotes] = useState<Note[]>(mockNotes);
+  const [user, setUser] = useState<User | null>(null);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('All');
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
@@ -70,6 +43,73 @@ const Notes = () => {
     tags: [] as string[],
     newTag: ''
   });
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // Check authentication and fetch notes
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
+        navigate('/auth');
+        return;
+      }
+      
+      setUser(session.user);
+      await fetchNotes(session.user.id);
+      setLoading(false);
+    };
+
+    checkAuth();
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!session?.user) {
+          navigate('/auth');
+        } else {
+          setUser(session.user);
+          await fetchNotes(session.user.id);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const fetchNotes = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching notes:', error);
+        toast({
+          title: "Error fetching notes",
+          description: error.message,
+          variant: "destructive"
+        });
+      } else {
+        const formattedNotes: Note[] = data.map(note => ({
+          id: note.id,
+          title: note.title,
+          content: note.content,
+          subject: note.subject,
+          tags: note.tags || [],
+          wordCount: note.word_count || 0,
+          createdAt: new Date(note.created_at).toISOString().split('T')[0],
+          updatedAt: new Date(note.updated_at).toISOString().split('T')[0]
+        }));
+        setNotes(formattedNotes);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
 
   const filteredNotes = notes.filter(note => {
     const matchesSearch = note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -107,48 +147,128 @@ const Notes = () => {
     setIsEditorOpen(true);
   };
 
-  const saveNote = () => {
-    if (!editingNote.title || !editingNote.content) return;
+  const saveNote = async () => {
+    if (!editingNote.title || !editingNote.content || !user) return;
 
-    const now = new Date().toISOString().split('T')[0];
-    const wordCount = editingNote.content.split(/\s+/).filter(word => word.length > 0).length;
+    try {
+      if (isEditing && selectedNote) {
+        // Update existing note
+        const { data, error } = await supabase
+          .from('notes')
+          .update({
+            title: editingNote.title,
+            content: editingNote.content,
+            subject: editingNote.subject,
+            tags: editingNote.tags
+          })
+          .eq('id', selectedNote.id)
+          .eq('user_id', user.id)
+          .select()
+          .single();
 
-    if (isEditing && selectedNote) {
-      setNotes(prev => prev.map(note => 
-        note.id === selectedNote.id 
-          ? {
-              ...note,
+        if (error) {
+          toast({
+            title: "Error updating note",
+            description: error.message,
+            variant: "destructive"
+          });
+        } else {
+          const updatedNote: Note = {
+            id: data.id,
+            title: data.title,
+            content: data.content,
+            subject: data.subject,
+            tags: data.tags || [],
+            wordCount: data.word_count || 0,
+            createdAt: new Date(data.created_at).toISOString().split('T')[0],
+            updatedAt: new Date(data.updated_at).toISOString().split('T')[0]
+          };
+          
+          setNotes(prev => prev.map(note => 
+            note.id === selectedNote.id ? updatedNote : note
+          ));
+          setSelectedNote(updatedNote);
+          toast({
+            title: "Note updated",
+            description: "Your note has been successfully updated.",
+          });
+        }
+      } else {
+        // Create new note
+        const { data, error } = await supabase
+          .from('notes')
+          .insert([
+            {
+              user_id: user.id,
               title: editingNote.title,
               content: editingNote.content,
               subject: editingNote.subject,
-              tags: editingNote.tags,
-              updatedAt: now,
-              wordCount
+              tags: editingNote.tags
             }
-          : note
-      ));
-      setSelectedNote(prev => prev ? { ...prev, title: editingNote.title, content: editingNote.content } : null);
-    } else {
-      const newNote: Note = {
-        id: Date.now().toString(),
-        title: editingNote.title,
-        content: editingNote.content,
-        subject: editingNote.subject,
-        tags: editingNote.tags,
-        createdAt: now,
-        updatedAt: now,
-        wordCount
-      };
-      setNotes(prev => [newNote, ...prev]);
-    }
+          ])
+          .select()
+          .single();
 
-    setIsEditorOpen(false);
+        if (error) {
+          toast({
+            title: "Error creating note",
+            description: error.message,
+            variant: "destructive"
+          });
+        } else {
+          const newNote: Note = {
+            id: data.id,
+            title: data.title,
+            content: data.content,
+            subject: data.subject,
+            tags: data.tags || [],
+            wordCount: data.word_count || 0,
+            createdAt: new Date(data.created_at).toISOString().split('T')[0],
+            updatedAt: new Date(data.updated_at).toISOString().split('T')[0]
+          };
+          
+          setNotes(prev => [newNote, ...prev]);
+          toast({
+            title: "Note created",
+            description: "Your new note has been added successfully.",
+          });
+        }
+      }
+
+      setIsEditorOpen(false);
+    } catch (error) {
+      console.error('Error saving note:', error);
+    }
   };
 
-  const deleteNote = (noteId: string) => {
-    setNotes(prev => prev.filter(note => note.id !== noteId));
-    if (selectedNote?.id === noteId) {
-      setSelectedNote(null);
+  const deleteNote = async (noteId: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('notes')
+        .delete()
+        .eq('id', noteId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        toast({
+          title: "Error deleting note",
+          description: error.message,
+          variant: "destructive"
+        });
+      } else {
+        setNotes(prev => prev.filter(note => note.id !== noteId));
+        if (selectedNote?.id === noteId) {
+          setSelectedNote(null);
+        }
+        toast({
+          title: "Note deleted",
+          description: "Note has been successfully deleted.",
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting note:', error);
     }
   };
 
@@ -168,6 +288,21 @@ const Notes = () => {
       tags: prev.tags.filter(tag => tag !== tagToRemove)
     }));
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-card flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin mx-auto mb-4 border-4 border-primary border-t-transparent rounded-full" />
+          <p>Loading your notes...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null; // Will redirect to auth
+  }
 
   return (
     <div className="p-6">

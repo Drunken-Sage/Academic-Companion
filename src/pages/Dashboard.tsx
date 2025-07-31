@@ -57,48 +57,9 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Mock data - in a real app, this would come from your database
-  const [tasks] = useState<Task[]>([
-    {
-      id: '1',
-      title: 'Complete Math Assignment Chapter 5',
-      completed: false,
-      priority: 'high',
-      dueDate: new Date(2024, 11, 24),
-      category: 'Mathematics'
-    },
-    {
-      id: '2',
-      title: 'Read Computer Science Research Paper',
-      completed: true,
-      priority: 'medium',
-      dueDate: new Date(2024, 11, 23),
-      category: 'Computer Science'
-    },
-    {
-      id: '3',
-      title: 'Prepare Physics Lab Report',
-      completed: false,
-      priority: 'medium',
-      dueDate: new Date(2024, 11, 25),
-      category: 'Physics'
-    },
-    {
-      id: '4',
-      title: 'Study Group Meeting - History',
-      completed: false,
-      priority: 'low',
-      dueDate: new Date(2024, 11, 26),
-      category: 'History'
-    }
-  ]);
-
-  const [studySessions] = useState<StudySession[]>([
-    { id: '1', subject: 'Mathematics', duration: 120, date: new Date(2024, 11, 21) },
-    { id: '2', subject: 'Physics', duration: 90, date: new Date(2024, 11, 21) },
-    { id: '3', subject: 'Computer Science', duration: 150, date: new Date(2024, 11, 22) },
-    { id: '4', subject: 'History', duration: 60, date: new Date(2024, 11, 22) },
-  ]);
+  // Real data from Supabase
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [studySessions, setStudySessions] = useState<StudySession[]>([]);
 
   useEffect(() => {
     // Set up auth state listener
@@ -110,9 +71,10 @@ const Dashboard = () => {
         if (!session?.user) {
           navigate('/auth');
         } else {
-          // Fetch user profile after authentication
+          // Fetch user profile and data after authentication
           setTimeout(() => {
             fetchUserProfile(session.user.id);
+            fetchUserData(session.user.id);
           }, 0);
         }
       }
@@ -127,6 +89,7 @@ const Dashboard = () => {
         navigate('/auth');
       } else {
         fetchUserProfile(session.user.id);
+        fetchUserData(session.user.id);
       }
       setLoading(false);
     });
@@ -153,6 +116,53 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Error:', error);
+    }
+  };
+
+  const fetchUserData = async (userId: string) => {
+    try {
+      // Fetch tasks
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (tasksError) {
+        console.error('Error fetching tasks:', tasksError);
+      } else {
+        const formattedTasks: Task[] = tasksData.map(task => ({
+          id: task.id,
+          title: task.title,
+          completed: task.status === 'completed',
+          priority: task.priority as 'high' | 'medium' | 'low',
+          dueDate: new Date(task.due_date),
+          category: task.subject
+        }));
+        setTasks(formattedTasks);
+      }
+
+      // Fetch study sessions
+      const { data: sessionsData, error: sessionsError } = await supabase
+        .from('study_sessions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('session_date', { ascending: false })
+        .limit(10);
+
+      if (sessionsError) {
+        console.error('Error fetching study sessions:', sessionsError);
+      } else {
+        const formattedSessions: StudySession[] = sessionsData.map(session => ({
+          id: session.id,
+          subject: session.subject,
+          duration: session.duration_minutes,
+          date: new Date(session.session_date)
+        }));
+        setStudySessions(formattedSessions);
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
     }
   };
 
