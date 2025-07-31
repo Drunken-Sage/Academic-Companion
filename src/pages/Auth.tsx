@@ -155,8 +155,8 @@ const Auth = () => {
               {isSignUp ? "Sign Up" : "Sign In"}
             </CardTitle>
             <CardDescription>
-              {isSignUp 
-                ? "Start your academic journey with us" 
+              {isSignUp
+                ? "Start your academic journey with us"
                 : "Enter your credentials to access your dashboard"
               }
             </CardDescription>
