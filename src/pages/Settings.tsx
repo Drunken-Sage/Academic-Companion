@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from '@supabase/supabase-js';
 import { Settings as SettingsIcon, Moon, Sun, User as UserIcon, BookOpen, Plus, X } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/lib/theme-provider";
 
 interface UserCourse {
   id: string;
