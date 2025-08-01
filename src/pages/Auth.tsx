@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from '@supabase/supabase-js';
-import { Eye, EyeOff, BookOpen } from "lucide-react";
+import { Eye, EyeOff, BookOpen, Plus, X } from "lucide-react";
 
 const Auth = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -15,6 +15,8 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [major, setMajor] = useState("");
+  const [courses, setCourses] = useState<string[]>(['']);
+  const [newCourse, setNewCourse] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -73,7 +75,8 @@ const Auth = () => {
           emailRedirectTo: redirectUrl,
           data: {
             display_name: displayName,
-            major: major
+            major: major,
+            courses: courses.filter(course => course.trim())
           }
         }
       });
@@ -195,6 +198,55 @@ const Auth = () => {
                       value={major}
                       onChange={(e) => setMajor(e.target.value)}
                     />
+                  </div>
+                  
+                  {/* Course Selection */}
+                  <div className="space-y-2">
+                    <Label>Courses (Optional)</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Add the courses you're currently taking. You can modify these later in settings.
+                    </p>
+                    
+                    <div className="space-y-2">
+                      {courses.map((course, index) => (
+                        <div key={index} className="flex gap-2">
+                          <Input
+                            type="text"
+                            placeholder={`Course ${index + 1} (e.g. CS101 - Intro to Computer Science)`}
+                            value={course}
+                            onChange={(e) => {
+                              const newCourses = [...courses];
+                              newCourses[index] = e.target.value;
+                              setCourses(newCourses);
+                            }}
+                          />
+                          {courses.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const newCourses = courses.filter((_, i) => i !== index);
+                                setCourses(newCourses);
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCourses([...courses, ''])}
+                        className="w-full"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Another Course
+                      </Button>
+                    </div>
                   </div>
                 </>
               )}

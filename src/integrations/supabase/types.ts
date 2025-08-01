@@ -53,6 +53,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          courses: string[] | null
           created_at: string
           display_name: string | null
           id: string
@@ -62,6 +63,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          courses?: string[] | null
           created_at?: string
           display_name?: string | null
           id?: string
@@ -71,6 +73,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          courses?: string[] | null
           created_at?: string
           display_name?: string | null
           id?: string
@@ -141,6 +144,39 @@ export type Database = {
           status?: string
           subject?: string
           title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_courses: {
+        Row: {
+          course_code: string | null
+          course_name: string
+          created_at: string
+          id: string
+          instructor: string | null
+          semester: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          course_code?: string | null
+          course_name: string
+          created_at?: string
+          id?: string
+          instructor?: string | null
+          semester?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          course_code?: string | null
+          course_name?: string
+          created_at?: string
+          id?: string
+          instructor?: string | null
+          semester?: string | null
           updated_at?: string
           user_id?: string
         }

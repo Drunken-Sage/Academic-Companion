@@ -5,7 +5,8 @@ import {
   FolderOpen,
   BarChart3,
   FileText,
-  Home
+  Home,
+  Settings
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -31,6 +32,7 @@ const toolsItems = [
   { title: "Files", url: "/files", icon: FolderOpen },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Notes", url: "/notes", icon: FileText },
+  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
