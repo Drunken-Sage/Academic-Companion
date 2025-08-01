@@ -1,36 +1,126 @@
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { supabase } from "@/integrations/supabase/client";
+import { format, startOfWeek, endOfWeek, subDays } from "date-fns";
 
-const timePerSubjectData = [
-  { subject: 'Physics', hours: 8.5 },
-  { subject: 'Math', hours: 12.2 },
-  { subject: 'Chemistry', hours: 6.8 },
-  { subject: 'History', hours: 5.4 },
-  { subject: 'English', hours: 4.2 }
-];
+interface StudySession {
+  id: string;
+  subject: string;
+  duration_minutes: number;
+  session_date: string;
+}
 
-const dailyStudyTimeData = [
-  { day: 'Mon', hours: 3.5 },
-  { day: 'Tue', hours: 4.2 },
-  { day: 'Wed', hours: 2.8 },
-  { day: 'Thu', hours: 5.1 },
-  { day: 'Fri', hours: 3.9 },
-  { day: 'Sat', hours: 6.2 },
-  { day: 'Sun', hours: 4.5 }
-];
-
-const taskStatusData = [
-  { name: 'Completed', value: 65, color: '#10b981' },
-  { name: 'Pending', value: 25, color: '#f59e0b' },
-  { name: 'Overdue', value: 10, color: '#ef4444' }
-];
+interface Task {
+  id: string;
+  title: string;
+  status: string;
+  subject: string;
+  due_date: string;
+}
 
 const Analytics = () => {
+  const [studySessions, setStudySessions] = useState<StudySession[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Fetch study sessions for the last 30 days
+        const thirtyDaysAgo = format(subDays(new Date(), 30), 'yyyy-MM-dd');
+        const { data: sessions } = await supabase
+          .from('study_sessions')
+          .select('*')
+          .eq('user_id', user.id)
+          .gte('session_date', thirtyDaysAgo)
+          .order('session_date', { ascending: true });
+
+        // Fetch all tasks
+        const { data: tasksData } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        setStudySessions(sessions || []);
+        setTasks(tasksData || []);
+      } catch (error) {
+        console.error('Error fetching analytics data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Calculate analytics data
+  const timePerSubjectData = studySessions.reduce((acc, session) => {
+    const existing = acc.find(item => item.subject === session.subject);
+    if (existing) {
+      existing.hours += session.duration_minutes / 60;
+    } else {
+      acc.push({ subject: session.subject, hours: session.duration_minutes / 60 });
+    }
+    return acc;
+  }, [] as { subject: string; hours: number }[]);
+
+  // Get current week study data
+  const weekStart = startOfWeek(new Date());
+  const weekEnd = endOfWeek(new Date());
+  const currentWeekSessions = studySessions.filter(session => {
+    const sessionDate = new Date(session.session_date);
+    return sessionDate >= weekStart && sessionDate <= weekEnd;
+  });
+
+  const dailyStudyTimeData = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(weekStart);
+    date.setDate(weekStart.getDate() + i);
+    const dayName = format(date, 'EEE');
+    const dayString = format(date, 'yyyy-MM-dd');
+    
+    const dayHours = currentWeekSessions
+      .filter(session => session.session_date === dayString)
+      .reduce((sum, session) => sum + session.duration_minutes / 60, 0);
+    
+    return { day: dayName, hours: Number(dayHours.toFixed(1)) };
+  });
+
+  // Calculate task statistics
+  const completedTasks = tasks.filter(task => task.status === 'completed').length;
+  const pendingTasks = tasks.filter(task => task.status === 'pending').length;
+  const overdueTasks = tasks.filter(task => {
+    const dueDate = new Date(task.due_date);
+    return task.status !== 'completed' && dueDate < new Date();
+  }).length;
+
+  const totalTasks = tasks.length;
+  const taskStatusData = totalTasks > 0 ? [
+    { name: 'Completed', value: Math.round((completedTasks / totalTasks) * 100), color: 'hsl(var(--chart-1))' },
+    { name: 'Pending', value: Math.round((pendingTasks / totalTasks) * 100), color: 'hsl(var(--chart-2))' },
+    { name: 'Overdue', value: Math.round((overdueTasks / totalTasks) * 100), color: 'hsl(var(--chart-3))' }
+  ] : [];
+
   const totalStudyHours = timePerSubjectData.reduce((sum, item) => sum + item.hours, 0);
-  const goalCompletionRate = 78; // percentage
   const weeklyGoal = 40; // hours
   const actualHours = dailyStudyTimeData.reduce((sum, item) => sum + item.hours, 0);
+  const goalCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Analytics Dashboard</h1>
+          <p className="text-muted-foreground">Loading your analytics data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -95,8 +185,8 @@ const Analytics = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="subject" />
                 <YAxis />
-                <Tooltip formatter={(value) => [`${value}h`, 'Study Time']} />
-                <Bar dataKey="hours" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Tooltip formatter={(value) => [`${Number(value).toFixed(1)}h`, 'Study Time']} />
+                <Bar dataKey="hours" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -114,13 +204,13 @@ const Analytics = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="day" />
                 <YAxis />
-                <Tooltip formatter={(value) => [`${value}h`, 'Study Time']} />
+                <Tooltip formatter={(value) => [`${Number(value).toFixed(1)}h`, 'Study Time']} />
                 <Line 
                   type="monotone" 
                   dataKey="hours" 
-                  stroke="hsl(var(--primary))" 
+                  stroke="hsl(var(--chart-1))" 
                   strokeWidth={3}
-                  dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 4 }}
+                  dot={{ fill: 'hsl(var(--chart-1))', strokeWidth: 2, r: 4 }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -161,10 +251,13 @@ const Analytics = () => {
                     className="w-3 h-3 rounded-full" 
                     style={{ backgroundColor: item.color }}
                   />
-                  <span className="text-sm">{item.name}</span>
+                  <span className="text-sm">{item.name} ({item.value}%)</span>
                 </div>
               ))}
             </div>
+            {taskStatusData.length === 0 && (
+              <p className="text-center text-muted-foreground mt-4">No task data available</p>
+            )}
           </CardContent>
         </Card>
 
@@ -198,10 +291,10 @@ const Analytics = () => {
 
             <div>
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium">Monthly Reading Goal</span>
-                <span className="text-sm text-muted-foreground">6 / 8 books</span>
+                <span className="text-sm font-medium">Total Notes</span>
+                <span className="text-sm text-muted-foreground">{timePerSubjectData.length} subjects</span>
               </div>
-              <Progress value={75} className="h-2" />
+              <Progress value={Math.min((timePerSubjectData.length / 5) * 100, 100)} className="h-2" />
             </div>
 
             <div className="pt-4 border-t">
