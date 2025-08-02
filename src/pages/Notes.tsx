@@ -25,11 +25,12 @@ interface Note {
   wordCount: number;
 }
 
-const subjects = ['All', 'Physics', 'Mathematics', 'History', 'Chemistry', 'English', 'Computer Science', 'Biology'];
+// Subjects will be loaded from user courses
 
 const Notes = () => {
   const [user, setUser] = useState<User | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
+  const [subjects, setSubjects] = useState<string[]>(['All']);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('All');
@@ -58,6 +59,7 @@ const Notes = () => {
       
       setUser(session.user);
       await fetchNotes(session.user.id);
+      await fetchUserCourses(session.user.id);
       setLoading(false);
     };
 
@@ -71,6 +73,7 @@ const Notes = () => {
         } else {
           setUser(session.user);
           await fetchNotes(session.user.id);
+          await fetchUserCourses(session.user.id);
         }
       }
     );
@@ -111,6 +114,30 @@ const Notes = () => {
     }
   };
 
+  const fetchUserCourses = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_courses')
+        .select('course_name')
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error fetching courses:', error);
+      } else {
+        const courseNames = data.map(course => course.course_name);
+        setSubjects(['All', ...courseNames]);
+        
+        // If no courses, provide default subjects
+        if (courseNames.length === 0) {
+          setSubjects(['All', 'General', 'Study Notes', 'Research']);
+        }
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      setSubjects(['All', 'General', 'Study Notes', 'Research']);
+    }
+  };
+
   const filteredNotes = notes.filter(note => {
     const matchesSearch = note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          note.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -138,7 +165,7 @@ const Notes = () => {
       setEditingNote({
         title: '',
         content: '',
-        subject: 'Physics',
+        subject: subjects.length > 1 ? subjects[1] : 'General',
         tags: [],
         newTag: ''
       });
