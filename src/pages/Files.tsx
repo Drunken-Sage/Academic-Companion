@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { Upload, Search, FileText, Download, Trash2, FolderOpen, Plus } from "lucide-react";
+import { Upload, Search, FileText, Download, Trash2, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import FilePreview from "@/components/FilePreview";
 
 interface UploadedFile {
   id: string;
@@ -191,10 +192,6 @@ const Files = () => {
           <h1 className="text-3xl font-bold">Files</h1>
           <p className="text-muted-foreground">Upload and manage your files</p>
         </div>
-        <Button onClick={() => fileInputRef.current?.click()}>
-          <Plus className="h-4 w-4 mr-2" />
-          Upload File
-        </Button>
       </div>
 
       <input
@@ -215,10 +212,9 @@ const Files = () => {
         <CardContent className="p-8 text-center">
           <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h3 className="text-lg font-semibold mb-2">Upload Files</h3>
-          <p className="text-muted-foreground mb-4">
-            Drag and drop files here, or click to select files
+          <p className="text-muted-foreground">
+            Drag and drop files here, or click anywhere in this area to select files
           </p>
-          <Button variant="outline">Choose Files</Button>
         </CardContent>
       </Card>
 
@@ -279,13 +275,9 @@ const Files = () => {
             <CardContent className="p-8 text-center">
               <FolderOpen className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
               <h3 className="text-lg font-semibold mb-2">No files yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Upload your first file to get started
+              <p className="text-muted-foreground">
+                Upload your first file to get started by using the drag and drop area above
               </p>
-              <Button onClick={() => fileInputRef.current?.click()}>
-                <Upload className="h-4 w-4 mr-2" />
-                Upload File
-              </Button>
             </CardContent>
           </Card>
         ) : (
@@ -307,6 +299,7 @@ const Files = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <FilePreview file={file} />
                     <Button 
                       variant="outline" 
                       size="sm"
