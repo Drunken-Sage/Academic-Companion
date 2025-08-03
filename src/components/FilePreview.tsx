@@ -30,7 +30,9 @@ const FilePreview = ({ file }: FilePreviewProps) => {
                  file.name.endsWith('.jsx') ||
                  file.name.endsWith('.tsx') ||
                  file.name.endsWith('.css') ||
-                 file.name.endsWith('.html');
+                 file.name.endsWith('.html') ||
+                 file.name.endsWith('.xml') ||
+                 file.name.endsWith('.csv');
   const isPDF = file.type === 'application/pdf';
 
   const handlePreview = async () => {
@@ -39,12 +41,23 @@ const FilePreview = ({ file }: FilePreviewProps) => {
     if (isText && !fileContent) {
       setLoading(true);
       try {
-        const response = await fetch(file.url);
+        // For Supabase storage, we need to fetch with proper headers
+        const response = await fetch(file.url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'text/plain, text/*, application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch file: ${response.statusText}`);
+        }
+        
         const text = await response.text();
         setFileContent(text);
       } catch (error) {
         console.error('Error loading file content:', error);
-        setFileContent('Error loading file content');
+        setFileContent('Error loading file content. The file might be too large or in a format that cannot be displayed as text.');
       } finally {
         setLoading(false);
       }

@@ -78,9 +78,8 @@ const Files = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
+      // Keep the original file name
+      const filePath = `${user.id}/${file.name}`;
 
       setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
 
