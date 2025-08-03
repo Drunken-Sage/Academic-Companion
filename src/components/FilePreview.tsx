@@ -7,9 +7,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 interface FilePreviewProps {
   file: {
     id: string;
-    name: string;
-    size: number;
-    type: string;
+    original_name: string;
+    display_name: string;
+    file_size: number;
+    mime_type: string;
+    storage_path: string;
     url: string;
     created_at: string;
   };
@@ -20,20 +22,20 @@ const FilePreview = ({ file }: FilePreviewProps) => {
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const isImage = file.type.startsWith('image/');
-  const isText = file.type.startsWith('text/') || 
-                 file.type === 'application/json' ||
-                 file.name.endsWith('.md') ||
-                 file.name.endsWith('.txt') ||
-                 file.name.endsWith('.js') ||
-                 file.name.endsWith('.ts') ||
-                 file.name.endsWith('.jsx') ||
-                 file.name.endsWith('.tsx') ||
-                 file.name.endsWith('.css') ||
-                 file.name.endsWith('.html') ||
-                 file.name.endsWith('.xml') ||
-                 file.name.endsWith('.csv');
-  const isPDF = file.type === 'application/pdf';
+  const isImage = file.mime_type.startsWith('image/');
+  const isText = file.mime_type.startsWith('text/') || 
+                 file.mime_type === 'application/json' ||
+                 file.display_name.endsWith('.md') ||
+                 file.display_name.endsWith('.txt') ||
+                 file.display_name.endsWith('.js') ||
+                 file.display_name.endsWith('.ts') ||
+                 file.display_name.endsWith('.jsx') ||
+                 file.display_name.endsWith('.tsx') ||
+                 file.display_name.endsWith('.css') ||
+                 file.display_name.endsWith('.html') ||
+                 file.display_name.endsWith('.xml') ||
+                 file.display_name.endsWith('.csv');
+  const isPDF = file.mime_type === 'application/pdf';
 
   const handlePreview = async () => {
     setIsOpen(true);
@@ -70,7 +72,7 @@ const FilePreview = ({ file }: FilePreviewProps) => {
         <div className="flex justify-center">
           <img 
             src={file.url} 
-            alt={file.name}
+            alt={file.display_name}
             className="max-w-full max-h-96 object-contain rounded-lg"
           />
         </div>
@@ -97,7 +99,7 @@ const FilePreview = ({ file }: FilePreviewProps) => {
           <iframe
             src={file.url}
             className="w-full h-96 border rounded-lg"
-            title={file.name}
+            title={file.display_name}
           />
         </div>
       );
@@ -109,7 +111,7 @@ const FilePreview = ({ file }: FilePreviewProps) => {
           Preview not available for this file type
         </p>
         <Button asChild>
-          <a href={file.url} download={file.name}>
+          <a href={file.url} download={file.display_name}>
             <Download className="h-4 w-4 mr-2" />
             Download to view
           </a>
@@ -132,14 +134,14 @@ const FilePreview = ({ file }: FilePreviewProps) => {
         <DialogContent className="max-w-4xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
-              <span>{file.name}</span>
+              <span>{file.display_name}</span>
               <div className="flex items-center gap-2">
                 <Button 
                   variant="outline" 
                   size="sm"
                   asChild
                 >
-                  <a href={file.url} download={file.name}>
+                  <a href={file.url} download={file.display_name}>
                     <Download className="h-4 w-4 mr-2" />
                     Download
                   </a>

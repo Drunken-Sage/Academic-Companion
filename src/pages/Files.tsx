@@ -10,9 +10,11 @@ import FilePreview from "@/components/FilePreview";
 
 interface UploadedFile {
   id: string;
-  name: string;
-  size: number;
-  type: string;
+  original_name: string;
+  display_name: string;
+  file_size: number;
+  mime_type: string;
+  storage_path: string;
   url: string;
   created_at: string;
 }
@@ -34,31 +36,26 @@ const Files = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: filesData, error } = await supabase.storage
-        .from('user-files')
-        .list(user.id, {
-          limit: 100,
-          offset: 0,
-        });
+      // Fetch file metadata from database
+      const { data: filesData, error } = await supabase
+        .from('user_files')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const filesWithUrls = await Promise.all(
-        filesData.map(async (file) => {
-          const { data: { publicUrl } } = supabase.storage
-            .from('user-files')
-            .getPublicUrl(`${user.id}/${file.name}`);
+      // Get public URLs for each file
+      const filesWithUrls = filesData.map((file) => {
+        const { data: { publicUrl } } = supabase.storage
+          .from('user-files')
+          .getPublicUrl(file.storage_path);
 
-          return {
-            id: file.id || file.name,
-            name: file.name,
-            size: file.metadata?.size || 0,
-            type: file.metadata?.mimetype || 'unknown',
-            url: publicUrl,
-            created_at: file.created_at || new Date().toISOString(),
-          };
-        })
-      );
+        return {
+          ...file,
+          url: publicUrl,
+        };
+      });
 
       setFiles(filesWithUrls);
     } catch (error) {
@@ -78,19 +75,36 @@ const Files = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Keep the original file name
-      const filePath = `${user.id}/${file.name}`;
+      // Generate unique storage path to handle duplicate names
+      const fileExt = file.name.split('.').pop();
+      const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const storagePath = `${user.id}/${uniqueFileName}`;
 
       setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
 
-      const { data, error } = await supabase.storage
+      // Upload to storage
+      const { data, error: uploadError } = await supabase.storage
         .from('user-files')
-        .upload(filePath, file, {
+        .upload(storagePath, file, {
           cacheControl: '3600',
           upsert: false
         });
 
-      if (error) throw error;
+      if (uploadError) throw uploadError;
+
+      // Save metadata to database
+      const { error: dbError } = await supabase
+        .from('user_files')
+        .insert({
+          user_id: user.id,
+          storage_path: storagePath,
+          original_name: file.name,
+          display_name: file.name,
+          file_size: file.size,
+          mime_type: file.type || 'application/octet-stream'
+        });
+
+      if (dbError) throw dbError;
 
       setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
 
@@ -120,18 +134,27 @@ const Files = () => {
     }
   };
 
-  const deleteFile = async (fileName: string) => {
+  const deleteFile = async (fileId: string, storagePath: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      const { error } = await supabase.storage
+      // Delete from storage
+      const { error: storageError } = await supabase.storage
         .from('user-files')
-        .remove([`${user.id}/${fileName}`]);
+        .remove([storagePath]);
 
-      if (error) throw error;
+      if (storageError) throw storageError;
 
-      setFiles(prev => prev.filter(file => file.name !== fileName));
+      // Delete from database
+      const { error: dbError } = await supabase
+        .from('user_files')
+        .delete()
+        .eq('id', fileId);
+
+      if (dbError) throw dbError;
+
+      setFiles(prev => prev.filter(file => file.id !== fileId));
       toast({
         title: "Success",
         description: "File deleted successfully",
@@ -170,7 +193,7 @@ const Files = () => {
   };
 
   const filteredFiles = files.filter(file =>
-    file.name.toLowerCase().includes(searchTerm.toLowerCase())
+    file.display_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -252,7 +275,7 @@ const Files = () => {
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">
-              {formatFileSize(files.reduce((sum, file) => sum + file.size, 0))}
+              {formatFileSize(files.reduce((sum, file) => sum + file.file_size, 0))}
             </div>
             <p className="text-sm text-muted-foreground">Total Size</p>
           </CardContent>
@@ -260,7 +283,7 @@ const Files = () => {
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">
-              {new Set(files.map(file => file.type)).size}
+              {new Set(files.map(file => file.mime_type)).size}
             </div>
             <p className="text-sm text-muted-foreground">File Types</p>
           </CardContent>
@@ -287,11 +310,11 @@ const Files = () => {
                   <div className="flex items-center gap-3">
                     <FileText className="h-8 w-8 text-primary" />
                     <div>
-                      <h3 className="font-semibold">{file.name}</h3>
+                      <h3 className="font-semibold">{file.display_name}</h3>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>{formatFileSize(file.size)}</span>
+                        <span>{formatFileSize(file.file_size)}</span>
                         <span>•</span>
-                        <span>{file.type}</span>
+                        <span>{file.mime_type}</span>
                         <span>•</span>
                         <span>{new Date(file.created_at).toLocaleDateString()}</span>
                       </div>
@@ -304,14 +327,14 @@ const Files = () => {
                       size="sm"
                       asChild
                     >
-                      <a href={file.url} download={file.name}>
+                      <a href={file.url} download={file.display_name}>
                         <Download className="h-4 w-4" />
                       </a>
                     </Button>
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => deleteFile(file.name)}
+                      onClick={() => deleteFile(file.id, file.storage_path)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
