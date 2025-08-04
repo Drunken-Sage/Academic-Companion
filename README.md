@@ -1,73 +1,45 @@
-# Welcome to your Lovable project
+# 🌐💡 Smart Academic Companion
 
-## Project info
+A full-featured, AI-powered web application designed to help college students manage their academic life efficiently. Smart Academic Companion combines productivity tools with intelligent insights to boost academic performance and time management.
 
-**URL**: https://lovable.dev/projects/2d72e73f-c430-4830-b809-701e70a17a35
+## 🚀 Features Overview
 
-## How can I edit this code?
+### 🔧 Core Modules (Frontend + Backend)
 
-There are several ways of editing your application.
+#### 📅 Calendar & Task Manager
+- Schedule classes, assignments, exams, and study sessions
+- Drag-and-drop calendar interface
+- Smart reminders and due-time notifications
 
-**Use Lovable**
+#### ✅ To-Do List + Goal Tracker
+- Create daily/weekly task lists with visual progress bars
+- Categorize tasks as **urgent**, **routine**, or **optional**
+- Set and track academic goals (e.g., “Complete 5 chapters this week”)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/2d72e73f-c430-4830-b809-701e70a17a35) and start prompting.
+#### 📁 Digital Resource Organizer
+- Upload and categorize learning materials by subject or tags
+- Preview PDF and DOC files directly in-browser
+- (Optional) Link external cloud storage like Google Drive or Dropbox
 
-Changes made via Lovable will be committed automatically to this repo.
 
-**Use your preferred IDE**
+#### 📊 Learning Progress Analyzer
+- Monitor study time per subject
+- View performance analytics using heatmaps and charts
+- Simulate academic grades based on task completion and consistency
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+#### 🧠 Smart Study Suggestion Engine
+- Recommends what and when to study next
+- Factors used:
+  - Past performance trends
+  - Upcoming deadlines
+  - Personal productivity patterns
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🛠 Tech Stack
 
-Follow these steps:
+- **Frontend**: React + TypeScript, Tailwind CSS
+- **Backend**: Supabase
+- **Database**: PostgreSQL / Supabase
+- **Authentication**: Supabase Auth
+- **Cloud Storage**: Supabase Storage / Google Drive API (optional)
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/2d72e73f-c430-4830-b809-701e70a17a35) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
