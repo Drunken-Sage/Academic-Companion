@@ -156,7 +156,7 @@ const Analytics = () => {
             <CardTitle className="text-sm font-medium">Tasks Completed</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{taskStatusData[0].value}%</div>
+            <div className="text-2xl font-bold">{taskStatusData.length > 0 ? taskStatusData[0].value : 0}%</div>
             <p className="text-xs text-muted-foreground">This week</p>
           </CardContent>
         </Card>

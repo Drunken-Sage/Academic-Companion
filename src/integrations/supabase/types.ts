@@ -149,6 +149,42 @@ export type Database = {
         }
         Relationships: []
       }
+      todos: {
+        Row: {
+          completed: boolean
+          created_at: string
+          description: string | null
+          due_date: string
+          id: string
+          priority: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          description?: string | null
+          due_date: string
+          id?: string
+          priority?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          description?: string | null
+          due_date?: string
+          id?: string
+          priority?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_courses: {
         Row: {
           course_code: string | null
@@ -177,6 +213,42 @@ export type Database = {
           id?: string
           instructor?: string | null
           semester?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_files: {
+        Row: {
+          created_at: string
+          display_name: string
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          original_name: string
+          storage_path: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          original_name: string
+          storage_path: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          original_name?: string
+          storage_path?: string
           updated_at?: string
           user_id?: string
         }
