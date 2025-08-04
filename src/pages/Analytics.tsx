@@ -83,11 +83,11 @@ const Analytics = () => {
     date.setDate(weekStart.getDate() + i);
     const dayName = format(date, 'EEE');
     const dayString = format(date, 'yyyy-MM-dd');
-    
+
     const dayHours = currentWeekSessions
       .filter(session => session.session_date === dayString)
       .reduce((sum, session) => sum + session.duration_minutes / 60, 0);
-    
+
     return { day: dayName, hours: Number(dayHours.toFixed(1)) };
   });
 
@@ -205,10 +205,10 @@ const Analytics = () => {
                 <XAxis dataKey="day" />
                 <YAxis />
                 <Tooltip formatter={(value) => [`${Number(value).toFixed(1)}h`, 'Study Time']} />
-                <Line 
-                  type="monotone" 
-                  dataKey="hours" 
-                  stroke="hsl(var(--chart-1))" 
+                <Line
+                  type="monotone"
+                  dataKey="hours"
+                  stroke="hsl(var(--chart-1))"
                   strokeWidth={3}
                   dot={{ fill: 'hsl(var(--chart-1))', strokeWidth: 2, r: 4 }}
                 />
@@ -247,8 +247,8 @@ const Analytics = () => {
             <div className="flex justify-center gap-4 mt-4">
               {taskStatusData.map((item, index) => (
                 <div key={index} className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
+                  <div
+                    className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: item.color }}
                   />
                   <span className="text-sm">{item.name} ({item.value}%)</span>
@@ -275,8 +275,8 @@ const Analytics = () => {
                   {actualHours}h / {weeklyGoal}h
                 </span>
               </div>
-              <Progress 
-                value={(actualHours / weeklyGoal) * 100} 
+              <Progress
+                value={(actualHours / weeklyGoal) * 100}
                 className="h-2"
               />
             </div>

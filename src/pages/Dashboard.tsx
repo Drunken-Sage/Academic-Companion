@@ -67,7 +67,7 @@ const Dashboard = () => {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (!session?.user) {
           navigate('/auth');
         } else {
@@ -84,7 +84,7 @@ const Dashboard = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (!session?.user) {
         navigate('/auth');
       } else {
@@ -392,24 +392,24 @@ const Dashboard = () => {
                 <span className="text-sm font-medium">{Math.round(progressPercentage)}%</span>
               </div>
               <Progress value={progressPercentage} className="h-2" />
-              
+
               {/* Week Overview */}
               <div className="grid grid-cols-7 gap-2 mt-6">
                 {weekDays.map((day) => {
                   const dayStudyTime = studySessions
                     .filter(session => isSameDay(session.date, day))
                     .reduce((total, session) => total + session.duration, 0);
-                  
+
                   return (
                     <div key={day.toString()} className="text-center">
                       <div className="text-xs text-muted-foreground mb-1">
                         {format(day, 'EEE')}
                       </div>
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium mx-auto ${
-                        isToday(day) 
-                          ? 'bg-primary text-primary-foreground' 
-                          : dayStudyTime > 0 
-                            ? 'bg-accent text-accent-foreground' 
+                        isToday(day)
+                          ? 'bg-primary text-primary-foreground'
+                          : dayStudyTime > 0
+                            ? 'bg-accent text-accent-foreground'
                             : 'bg-muted text-muted-foreground'
                       }`}>
                         {format(day, 'd')}
@@ -433,32 +433,32 @@ const Dashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full justify-start"
                 onClick={() => handleQuickAction('add-task')}
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 Add New Task
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full justify-start"
                 onClick={() => handleQuickAction('start-session')}
               >
                 <Clock className="h-4 w-4 mr-2" />
                 Start Study Session
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full justify-start"
                 onClick={() => handleQuickAction('create-note')}
               >
                 <FileText className="h-4 w-4 mr-2" />
                 Create Note
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full justify-start"
                 onClick={() => handleQuickAction('schedule-event')}
               >
@@ -494,7 +494,7 @@ const Dashboard = () => {
                     ))}
                   </div>
                 )}
-                
+
                 {pendingTasks.slice(0, 5).map((task) => (
                   <div key={task.id} className="flex items-center justify-between p-3 rounded-lg border">
                     <div className="flex items-center gap-3">
@@ -533,7 +533,7 @@ const Dashboard = () => {
                     .filter(session => session.subject === subject)
                     .reduce((total, session) => total + session.duration, 0);
                   const percentage = totalStudyTime > 0 ? (subjectTime / totalStudyTime) * 100 : 0;
-                  
+
                   return (
                     <div key={subject} className="space-y-2">
                       <div className="flex justify-between text-sm">

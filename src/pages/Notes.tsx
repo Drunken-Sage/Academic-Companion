@@ -50,12 +50,12 @@ const Notes = () => {
     // Check authentication and fetch notes
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session?.user) {
         navigate('/auth');
         return;
       }
-      
+
       setUser(session.user);
       await fetchNotes(session.user.id);
       setLoading(false);
@@ -116,7 +116,7 @@ const Notes = () => {
                          note.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          note.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesSubject = selectedSubject === 'All' || note.subject === selectedSubject;
-    
+
     return matchesSearch && matchesSubject;
   });
 
@@ -183,8 +183,8 @@ const Notes = () => {
             createdAt: new Date(data.created_at).toISOString().split('T')[0],
             updatedAt: new Date(data.updated_at).toISOString().split('T')[0]
           };
-          
-          setNotes(prev => prev.map(note => 
+
+          setNotes(prev => prev.map(note =>
             note.id === selectedNote.id ? updatedNote : note
           ));
           setSelectedNote(updatedNote);
@@ -226,7 +226,7 @@ const Notes = () => {
             createdAt: new Date(data.created_at).toISOString().split('T')[0],
             updatedAt: new Date(data.updated_at).toISOString().split('T')[0]
           };
-          
+
           setNotes(prev => [newNote, ...prev]);
           toast({
             title: "Note created",
@@ -341,8 +341,8 @@ const Notes = () => {
 
           <div className="space-y-3 max-h-[600px] overflow-y-auto">
             {filteredNotes.map(note => (
-              <Card 
-                key={note.id} 
+              <Card
+                key={note.id}
                 className={`cursor-pointer transition-colors hover:bg-accent ${
                   selectedNote?.id === note.id ? 'ring-2 ring-primary' : ''
                 }`}
@@ -352,9 +352,9 @@ const Notes = () => {
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="font-semibold text-sm line-clamp-1">{note.title}</h3>
                     <div className="flex gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
                           openEditor(note);
@@ -362,9 +362,9 @@ const Notes = () => {
                       >
                         <Edit className="h-3 w-3" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
                           deleteNote(note.id);
@@ -465,8 +465,8 @@ const Notes = () => {
               </div>
               <div>
                 <Label htmlFor="subject">Subject</Label>
-                <Select 
-                  value={editingNote.subject} 
+                <Select
+                  value={editingNote.subject}
                   onValueChange={(value) => setEditingNote(prev => ({ ...prev, subject: value }))}
                 >
                   <SelectTrigger>

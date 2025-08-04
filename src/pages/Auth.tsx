@@ -52,7 +52,7 @@ const Auth = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
         navigate('/dashboard');
       }
@@ -67,7 +67,7 @@ const Auth = () => {
 
     try {
       const redirectUrl = `${window.location.origin}/auth`;
-      
+
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -199,14 +199,14 @@ const Auth = () => {
                       onChange={(e) => setMajor(e.target.value)}
                     />
                   </div>
-                  
+
                   {/* Course Selection */}
                   <div className="space-y-2">
                     <Label>Courses (Optional)</Label>
                     <p className="text-sm text-muted-foreground">
                       Add the courses you're currently taking. You can modify these later in settings.
                     </p>
-                    
+
                     <div className="space-y-2">
                       {courses.map((course, index) => (
                         <div key={index} className="flex gap-2">
@@ -235,7 +235,7 @@ const Auth = () => {
                           )}
                         </div>
                       ))}
-                      
+
                       <Button
                         type="button"
                         variant="outline"
@@ -250,7 +250,7 @@ const Auth = () => {
                   </div>
                 </>
               )}
-              
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -316,8 +316,8 @@ const Auth = () => {
         </Card>
 
         <div className="text-center">
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             ← Back to home

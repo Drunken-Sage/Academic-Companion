@@ -50,12 +50,12 @@ const Tasks = () => {
     // Check authentication and fetch tasks
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session?.user) {
         navigate('/auth');
         return;
       }
-      
+
       setUser(session.user);
       await fetchTasks(session.user.id);
       setLoading(false);
@@ -116,7 +116,7 @@ const Tasks = () => {
                          task.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSubject = selectedSubject === 'All' || task.subject === selectedSubject;
     const matchesPriority = selectedPriority === 'All' || task.priority === selectedPriority;
-    
+
     return matchesSearch && matchesSubject && matchesPriority;
   });
 
@@ -166,7 +166,7 @@ const Tasks = () => {
           variant: "destructive"
         });
       } else {
-        setTasks(prev => prev.map(t => 
+        setTasks(prev => prev.map(t =>
           t.id === taskId ? { ...t, status: nextStatus } : t
         ));
         toast({
@@ -209,7 +209,14 @@ const Tasks = () => {
 
   const addTask = async () => {
     if (!newTask.title || !newTask.subject || !newTask.dueDate || !user) return;
-    
+    if (new Date(newTask.dueDate) < new Date()) {
+      toast({
+        title: "Invalid Due Date",
+        description: "Due date cannot be in the past.",
+        variant: "destructive"
+      });
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('tasks')

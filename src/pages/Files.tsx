@@ -46,7 +46,7 @@ const Files = () => {
 
         if (notesData) {
           setNotes(notesData);
-          
+
           // Extract unique subjects
           const uniqueSubjects = ['All', ...new Set(notesData.map(note => note.subject))];
           setSubjects(uniqueSubjects);
@@ -71,7 +71,7 @@ const Files = () => {
                          note.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          note.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesSubject = selectedSubject === 'All' || note.subject === selectedSubject;
-    
+
     return matchesSearch && matchesSubject;
   });
 

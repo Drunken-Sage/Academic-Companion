@@ -89,14 +89,14 @@ const TodoCalendar = () => {
       completed: false,
       priority: newTodo.priority
     };
-    
+
     setTodos([...todos, todo]);
     setNewTodo({ title: '', description: '', priority: 'medium' });
     setIsDialogOpen(false);
   };
 
   const toggleTodo = (id: string) => {
-    setTodos(todos.map(todo => 
+    setTodos(todos.map(todo =>
       todo.id === id ? { ...todo, completed: !todo.completed } : todo
     ));
   };
@@ -132,7 +132,7 @@ const TodoCalendar = () => {
           <TabsTrigger value="calendar">Calendar View</TabsTrigger>
           <TabsTrigger value="list">List View</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="calendar" className="space-y-6">
           <div className="grid lg:grid-cols-2 gap-6">
             {/* Calendar */}
