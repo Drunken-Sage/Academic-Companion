@@ -444,14 +444,6 @@ const Dashboard = () => {
               <Button
                 variant="outline"
                 className="w-full justify-start"
-                onClick={() => handleQuickAction('start-session')}
-              >
-                <Clock className="h-4 w-4 mr-2" />
-                Start Study Session
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full justify-start"
                 onClick={() => handleQuickAction('create-note')}
               >
                 <FileText className="h-4 w-4 mr-2" />
@@ -469,94 +461,49 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Recent Tasks */}
-          <Card className="bg-background/50 backdrop-blur border-border/50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5" />
-                Recent Tasks
-              </CardTitle>
-              <CardDescription>
-                Your upcoming and overdue assignments
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {overdueTasks.length > 0 && (
-                  <div className="border-l-4 border-destructive pl-4 py-2 bg-destructive/5 rounded-r">
-                    <p className="text-sm font-medium text-destructive mb-2">Overdue Tasks</p>
-                    {overdueTasks.map((task) => (
-                      <div key={task.id} className="flex items-center gap-2 mb-1">
-                        <div className="w-2 h-2 bg-destructive rounded-full" />
-                        <span className="text-sm">{task.title}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {pendingTasks.slice(0, 5).map((task) => (
-                  <div key={task.id} className="flex items-center justify-between p-3 rounded-lg border">
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <p className="text-sm font-medium">{task.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Due {format(task.dueDate, 'MMM d')} • {task.category}
-                        </p>
-                      </div>
+        {/* Recent Tasks */}
+        <Card className="bg-background/50 backdrop-blur border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5" />
+              Recent Tasks
+            </CardTitle>
+            <CardDescription>
+              Your upcoming and overdue assignments
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {overdueTasks.length > 0 && (
+                <div className="border-l-4 border-destructive pl-4 py-2 bg-destructive/5 rounded-r">
+                  <p className="text-sm font-medium text-destructive mb-2">Overdue Tasks</p>
+                  {overdueTasks.map((task) => (
+                    <div key={task.id} className="flex items-center gap-2 mb-1">
+                      <div className="w-2 h-2 bg-destructive rounded-full" />
+                      <span className="text-sm">{task.title}</span>
                     </div>
-                    <Badge variant={getPriorityColor(task.priority)}>
-                      {task.priority}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              )}
 
-          {/* Study Statistics */}
-          <Card className="bg-background/50 backdrop-blur border-border/50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Study Statistics
-              </CardTitle>
-              <CardDescription>
-                Your study patterns and subject breakdown
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {studySessions.length > 0 ? (
-                  // Group by subject and calculate study time
-                  Object.entries(
-                    studySessions.reduce((acc, session) => {
-                      acc[session.subject] = (acc[session.subject] || 0) + session.duration;
-                      return acc;
-                    }, {} as Record<string, number>)
-                  ).map(([subject, time]) => {
-                    const percentage = totalStudyTime > 0 ? (time / totalStudyTime) * 100 : 0;
-                    return (
-                      <div key={subject} className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>{subject}</span>
-                          <span className="text-muted-foreground">
-                            {Math.round(time / 60)}h ({Math.round(percentage)}%)
-                          </span>
-                        </div>
-                        <Progress value={percentage} className="h-1" />
-                      </div>
-                    );
-                  })
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No study sessions recorded yet
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              {pendingTasks.slice(0, 5).map((task) => (
+                <div key={task.id} className="flex items-center justify-between p-3 rounded-lg border">
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <p className="text-sm font-medium">{task.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Due {format(task.dueDate, 'MMM d')} • {task.category}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant={getPriorityColor(task.priority)}>
+                    {task.priority}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

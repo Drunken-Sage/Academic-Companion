@@ -37,6 +37,24 @@ const FilePreview = ({ file }: FilePreviewProps) => {
                  file.display_name.endsWith('.csv');
   const isPDF = file.mime_type === 'application/pdf';
 
+  const downloadFile = async () => {
+    try {
+      const response = await fetch(file.url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = file.original_name;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+    }
+  };
+
   const handlePreview = async () => {
     setIsOpen(true);
     
@@ -110,11 +128,9 @@ const FilePreview = ({ file }: FilePreviewProps) => {
         <p className="text-muted-foreground mb-4">
           Preview not available for this file type
         </p>
-        <Button asChild>
-          <a href={file.url} download={file.display_name}>
-            <Download className="h-4 w-4 mr-2" />
-            Download to view
-          </a>
+        <Button onClick={downloadFile}>
+          <Download className="h-4 w-4 mr-2" />
+          Download to view
         </Button>
       </div>
     );
@@ -139,12 +155,10 @@ const FilePreview = ({ file }: FilePreviewProps) => {
                 <Button 
                   variant="outline" 
                   size="sm"
-                  asChild
+                  onClick={downloadFile}
                 >
-                  <a href={file.url} download={file.display_name}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download
-                  </a>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
                 </Button>
                 <Button 
                   variant="outline" 

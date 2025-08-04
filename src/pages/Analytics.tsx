@@ -1,9 +1,16 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfWeek, endOfWeek, subDays } from "date-fns";
+import { Plus } from "lucide-react";
 
 interface StudySession {
   id: string;
@@ -25,6 +32,13 @@ const Analytics = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [userCourses, setUserCourses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSessionDialogOpen, setIsSessionDialogOpen] = useState(false);
+  const [newSession, setNewSession] = useState({
+    subject: '',
+    duration_minutes: '',
+    session_date: format(new Date(), 'yyyy-MM-dd')
+  });
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -68,6 +82,70 @@ const Analytics = () => {
 
     fetchData();
   }, []);
+
+  const createStudySession = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      if (!newSession.subject || !newSession.duration_minutes) {
+        toast({
+          title: "Error",
+          description: "Please fill in all required fields",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('study_sessions')
+        .insert({
+          user_id: user.id,
+          subject: newSession.subject,
+          duration_minutes: parseInt(newSession.duration_minutes),
+          session_date: newSession.session_date
+        });
+
+      if (error) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Study session created successfully"
+        });
+        
+        // Reset form
+        setNewSession({
+          subject: '',
+          duration_minutes: '',
+          session_date: format(new Date(), 'yyyy-MM-dd')
+        });
+        setIsSessionDialogOpen(false);
+
+        // Refresh data
+        const thirtyDaysAgo = format(subDays(new Date(), 30), 'yyyy-MM-dd');
+        const { data: sessions } = await supabase
+          .from('study_sessions')
+          .select('*')
+          .eq('user_id', user.id)
+          .gte('session_date', thirtyDaysAgo)
+          .order('session_date', { ascending: true });
+
+        setStudySessions(sessions || []);
+      }
+    } catch (error) {
+      console.error('Error creating study session:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create study session",
+        variant: "destructive"
+      });
+    }
+  };
 
   // Calculate analytics data - filter by user courses if available
   const timePerSubjectData = studySessions.reduce((acc, session) => {
@@ -137,9 +215,85 @@ const Analytics = () => {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Analytics Dashboard</h1>
-        <p className="text-muted-foreground">Track your academic progress and study patterns</p>
+      <div className="mb-6 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Analytics Dashboard</h1>
+          <p className="text-muted-foreground">Track your academic progress and study patterns</p>
+        </div>
+        <Dialog open={isSessionDialogOpen} onOpenChange={setIsSessionDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Study Session
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Study Session</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="subject">Subject</Label>
+                <Select
+                  value={newSession.subject}
+                  onValueChange={(value) => setNewSession(prev => ({ ...prev, subject: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a subject" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {userCourses.map((course) => (
+                      <SelectItem key={course} value={course}>
+                        {course}
+                      </SelectItem>
+                    ))}
+                    {userCourses.length === 0 && (
+                      <>
+                        <SelectItem value="Mathematics">Mathematics</SelectItem>
+                        <SelectItem value="Science">Science</SelectItem>
+                        <SelectItem value="English">English</SelectItem>
+                        <SelectItem value="History">History</SelectItem>
+                        <SelectItem value="General">General</SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="duration">Duration (minutes)</Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  min="1"
+                  value={newSession.duration_minutes}
+                  onChange={(e) => setNewSession(prev => ({ ...prev, duration_minutes: e.target.value }))}
+                  placeholder="e.g., 60"
+                />
+              </div>
+              <div>
+                <Label htmlFor="date">Session Date</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={newSession.session_date}
+                  onChange={(e) => setNewSession(prev => ({ ...prev, session_date: e.target.value }))}
+                />
+              </div>
+              <div className="flex gap-2 pt-4">
+                <Button onClick={createStudySession} className="flex-1">
+                  Create Session
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsSessionDialogOpen(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
