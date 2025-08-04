@@ -23,6 +23,7 @@ interface Task {
 const Analytics = () => {
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [userCourses, setUserCourses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,6 +48,15 @@ const Analytics = () => {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
 
+        // Fetch user courses for filtering
+        const { data: coursesData } = await supabase
+          .from('user_courses')
+          .select('course_name')
+          .eq('user_id', user.id);
+
+        const courseNames = coursesData?.map(course => course.course_name) || [];
+        setUserCourses(courseNames);
+
         setStudySessions(sessions || []);
         setTasks(tasksData || []);
       } catch (error) {
@@ -59,13 +69,16 @@ const Analytics = () => {
     fetchData();
   }, []);
 
-  // Calculate analytics data
+  // Calculate analytics data - filter by user courses if available
   const timePerSubjectData = studySessions.reduce((acc, session) => {
-    const existing = acc.find(item => item.subject === session.subject);
-    if (existing) {
-      existing.hours += session.duration_minutes / 60;
-    } else {
-      acc.push({ subject: session.subject, hours: session.duration_minutes / 60 });
+    // Only include sessions for user's courses, or all if no courses defined
+    if (userCourses.length === 0 || userCourses.includes(session.subject)) {
+      const existing = acc.find(item => item.subject === session.subject);
+      if (existing) {
+        existing.hours += session.duration_minutes / 60;
+      } else {
+        acc.push({ subject: session.subject, hours: session.duration_minutes / 60 });
+      }
     }
     return acc;
   }, [] as { subject: string; hours: number }[]);

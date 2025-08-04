@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { User } from '@supabase/supabase-js';
-import { Plus, Search, BookOpen, Edit, Trash2, Save, Tag, Clock } from "lucide-react";
+import { Plus, Search, BookOpen, Edit, Trash2, Save, Tag, Clock, Upload, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import FilePreview from "@/components/FilePreview";
 
 interface Note {
   id: string;
@@ -25,18 +28,32 @@ interface Note {
   wordCount: number;
 }
 
+interface UploadedFile {
+  id: string;
+  original_name: string;
+  display_name: string;
+  file_size: number;
+  mime_type: string;
+  storage_path: string;
+  url: string;
+  created_at: string;
+}
+
 // Subjects will be loaded from user courses
 
 const Notes = () => {
   const [user, setUser] = useState<User | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
+  const [files, setFiles] = useState<UploadedFile[]>([]);
   const [subjects, setSubjects] = useState<string[]>(['All']);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('All');
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  const [selectedFile, setSelectedFile] = useState<UploadedFile | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [editingNote, setEditingNote] = useState({
     title: '',
     content: '',
@@ -44,6 +61,7 @@ const Notes = () => {
     tags: [] as string[],
     newTag: ''
   });
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -59,6 +77,7 @@ const Notes = () => {
 
       setUser(session.user);
       await fetchNotes(session.user.id);
+      await fetchFiles(session.user.id);
       await fetchUserCourses(session.user.id);
       setLoading(false);
     };
@@ -73,6 +92,7 @@ const Notes = () => {
         } else {
           setUser(session.user);
           await fetchNotes(session.user.id);
+          await fetchFiles(session.user.id);
           await fetchUserCourses(session.user.id);
         }
       }
@@ -111,6 +131,40 @@ const Notes = () => {
       }
     } catch (error) {
       console.error('Error:', error);
+    }
+  };
+
+  const fetchFiles = async (userId: string) => {
+    try {
+      // Fetch file metadata from database
+      const { data: filesData, error } = await supabase
+        .from('user_files')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Get public URLs for each file
+      const filesWithUrls = filesData.map((file) => {
+        const { data: { publicUrl } } = supabase.storage
+          .from('user-files')
+          .getPublicUrl(file.storage_path);
+
+        return {
+          ...file,
+          url: publicUrl,
+        };
+      });
+
+      setFiles(filesWithUrls);
+    } catch (error) {
+      console.error('Error fetching files:', error);
+      toast({
+        title: "Error fetching files",
+        description: "Failed to load documents",
+        variant: "destructive",
+      });
     }
   };
 
@@ -316,6 +370,127 @@ const Notes = () => {
     }));
   };
 
+  const uploadFile = async (file: File) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Generate unique storage path
+      const fileExt = file.name.split('.').pop();
+      const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const storagePath = `${user.id}/${uniqueFileName}`;
+
+      setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
+
+      // Upload to storage
+      const { data, error: uploadError } = await supabase.storage
+        .from('user-files')
+        .upload(storagePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Save metadata to database
+      const { error: dbError } = await supabase
+        .from('user_files')
+        .insert({
+          user_id: user.id,
+          storage_path: storagePath,
+          original_name: file.name,
+          display_name: file.name,
+          file_size: file.size,
+          mime_type: file.type || 'application/octet-stream'
+        });
+
+      if (dbError) throw dbError;
+
+      setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
+      toast({
+        title: "Success",
+        description: "Document uploaded successfully",
+      });
+
+      // Refresh files list
+      fetchFiles(user.id);
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload document",
+        variant: "destructive",
+      });
+    } finally {
+      setTimeout(() => {
+        setUploadProgress(prev => {
+          const newProgress = { ...prev };
+          delete newProgress[file.name];
+          return newProgress;
+        });
+      }, 2000);
+    }
+  };
+
+  const deleteFile = async (fileId: string, storagePath: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Delete from storage
+      const { error: storageError } = await supabase.storage
+        .from('user-files')
+        .remove([storagePath]);
+
+      if (storageError) throw storageError;
+
+      // Delete from database
+      const { error: dbError } = await supabase
+        .from('user_files')
+        .delete()
+        .eq('id', fileId);
+
+      if (dbError) throw dbError;
+
+      setFiles(prev => prev.filter(file => file.id !== fileId));
+      toast({
+        title: "Success",
+        description: "Document deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete document",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(event.target.files || []);
+    selectedFiles.forEach(uploadFile);
+  };
+
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    const droppedFiles = Array.from(event.dataTransfer.files);
+    droppedFiles.forEach(uploadFile);
+  };
+
+  const handleDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const filteredFiles = files.filter(file =>
+    file.display_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-card flex items-center justify-center">
@@ -334,15 +509,49 @@ const Notes = () => {
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Notes</h1>
-        <Button onClick={() => openEditor()}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Note
-        </Button>
+        <h1 className="text-3xl font-bold">Notes & Documents</h1>
+        <div className="flex gap-2">
+          <Button onClick={() => fileInputRef.current?.click()} variant="outline">
+            <Upload className="h-4 w-4 mr-2" />
+            Upload Document
+          </Button>
+          <Button onClick={() => openEditor()}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Note
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Notes List */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
+      {/* Upload Progress */}
+      {Object.entries(uploadProgress).map(([fileName, progress]) => (
+        <Card key={fileName} className="mb-4">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">{fileName}</span>
+              <span className="text-sm text-muted-foreground">{progress}%</span>
+            </div>
+            <Progress value={progress} className="h-2" />
+          </CardContent>
+        </Card>
+      ))}
+
+      <Tabs defaultValue="notes" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="notes">Notes ({notes.length})</TabsTrigger>
+          <TabsTrigger value="documents">Documents ({files.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="notes">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Notes List */}
         <div className="lg:col-span-1">
           <div className="space-y-4 mb-6">
             <div className="relative">
@@ -469,9 +678,144 @@ const Notes = () => {
                 <p className="text-muted-foreground">Choose a note from the list to read its content</p>
               </div>
             </Card>
-          )}
-        </div>
-      </div>
+            )}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="documents">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Documents List */}
+            <div className="lg:col-span-1">
+              <div className="space-y-4 mb-6">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search documents..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              {/* Drop Zone */}
+              <Card 
+                className="mb-4 border-dashed border-2 hover:border-primary transition-colors cursor-pointer"
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <CardContent className="p-6 text-center">
+                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    Drop files here or click to upload
+                  </p>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                {filteredFiles.map(file => (
+                  <Card
+                    key={file.id}
+                    className={`cursor-pointer transition-colors hover:bg-accent ${
+                      selectedFile?.id === file.id ? 'ring-2 ring-primary' : ''
+                    }`}
+                    onClick={() => setSelectedFile(file)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-semibold text-sm line-clamp-1">{file.display_name}</h3>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <a href={file.url} download={file.display_name}>
+                              <Download className="h-3 w-3" />
+                            </a>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteFile(file.id, file.storage_path);
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">{file.mime_type}</span>
+                        <span className="text-xs text-muted-foreground">{formatFileSize(file.file_size)}</span>
+                      </div>
+                      <div className="flex items-center gap-1 mt-2">
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(file.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* Document Viewer */}
+            <div className="lg:col-span-2">
+              {selectedFile ? (
+                <Card className="h-[600px]">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="text-xl">{selectedFile.display_name}</CardTitle>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="outline">{selectedFile.mime_type}</Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {formatFileSize(selectedFile.file_size)}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            Uploaded: {new Date(selectedFile.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <FilePreview file={selectedFile} />
+                        <Button variant="outline" asChild>
+                          <a href={selectedFile.url} download={selectedFile.display_name}>
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <Separator />
+                  <CardContent className="p-6">
+                    <div className="text-center text-muted-foreground">
+                      <FileText className="h-16 w-16 mx-auto mb-4" />
+                      <p>Click "Preview" to view the document content</p>
+                      <p className="text-sm mt-2">Use the preview button or download to access the file</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="h-[600px] flex items-center justify-center">
+                  <div className="text-center">
+                    <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-semibold mb-2">Select a document to view</h3>
+                    <p className="text-muted-foreground">Choose a document from the list to preview its details</p>
+                  </div>
+                </Card>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Note Editor Dialog */}
       <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>

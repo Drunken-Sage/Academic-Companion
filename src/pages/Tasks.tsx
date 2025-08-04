@@ -3,11 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { User } from '@supabase/supabase-js';
-import { Plus, Search, Filter, Edit, Trash2, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { Plus, Search, Filter, Edit, Trash2, CheckCircle, Clock, AlertCircle, Calendar, CalendarIcon } from "lucide-react";
+import { format, isSameDay, startOfDay } from "date-fns";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -25,12 +27,13 @@ interface Task {
   createdAt: string;
 }
 
-const subjects = ['All', 'Physics', 'Mathematics', 'History', 'Chemistry', 'English', 'Computer Science', 'Biology'];
+// Subjects will be loaded from user courses
 const priorities = ['All', 'low', 'medium', 'high'];
 
 const Tasks = () => {
   const [user, setUser] = useState<User | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [subjects, setSubjects] = useState<string[]>(['All']);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('All');
@@ -58,6 +61,7 @@ const Tasks = () => {
 
       setUser(session.user);
       await fetchTasks(session.user.id);
+      await fetchUserCourses(session.user.id);
       setLoading(false);
     };
 
@@ -71,6 +75,7 @@ const Tasks = () => {
         } else {
           setUser(session.user);
           await fetchTasks(session.user.id);
+          await fetchUserCourses(session.user.id);
         }
       }
     );
@@ -108,6 +113,30 @@ const Tasks = () => {
       }
     } catch (error) {
       console.error('Error:', error);
+    }
+  };
+
+  const fetchUserCourses = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_courses')
+        .select('course_name')
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error fetching courses:', error);
+      } else {
+        const courseNames = data.map(course => course.course_name);
+        setSubjects(['All', ...courseNames]);
+        
+        // If no courses, provide default subjects
+        if (courseNames.length === 0) {
+          setSubjects(['All', 'General', 'Assignment', 'Project']);
+        }
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      setSubjects(['All', 'General', 'Assignment', 'Project']);
     }
   };
 
@@ -314,10 +343,21 @@ const Tasks = () => {
     return null; // Will redirect to auth
   }
 
+  const getDayTasks = (date: Date): Task[] => {
+    return tasks.filter(task => isSameDay(new Date(task.dueDate), date));
+  };
+
+  const getDaysWithTasks = (): Date[] => {
+    return tasks.map(task => startOfDay(new Date(task.dueDate)));
+  };
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Tasks</h1>
+        <div>
+          <h1 className="text-3xl font-bold">Tasks & Calendar</h1>
+          <p className="text-muted-foreground">Manage your tasks and view them in calendar format</p>
+        </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -387,7 +427,14 @@ const Tasks = () => {
         </Dialog>
       </div>
 
-      <div className="flex gap-4 mb-6">
+      <Tabs defaultValue="list" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="list">List View</TabsTrigger>
+          <TabsTrigger value="calendar">Calendar View</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="list">
+          <div className="flex gap-4 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -443,6 +490,89 @@ const Tasks = () => {
         
         <TabsContent value="completed">
           {tasksByStatus.completed.map(task => <TaskCard key={task.id} task={task} />)}
+        </TabsContent>
+          </Tabs>
+        </TabsContent>
+
+        <TabsContent value="calendar">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Calendar */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarIcon className="h-5 w-5" />
+                  Task Calendar
+                </CardTitle>
+                <CardDescription>
+                  Click on a date to view tasks for that day
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CalendarComponent
+                  mode="single"
+                  selected={new Date()}
+                  className="rounded-md"
+                  modifiers={{
+                    hasTasks: getDaysWithTasks()
+                  }}
+                  modifiersStyles={{
+                    hasTasks: { 
+                      backgroundColor: 'hsl(var(--primary))', 
+                      color: 'hsl(var(--primary-foreground))',
+                      fontWeight: 'bold'
+                    }
+                  }}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Today's Tasks */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Today's Tasks
+                </CardTitle>
+                <CardDescription>
+                  {getDayTasks(new Date()).length} task(s) due today
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {getDayTasks(new Date()).length === 0 ? (
+                  <p className="text-muted-foreground text-sm">No tasks due today</p>
+                ) : (
+                  getDayTasks(new Date()).map(task => (
+                    <div key={task.id} className="flex items-start gap-3 p-3 rounded-lg border">
+                      <button
+                        onClick={() => toggleTaskStatus(task.id)}
+                        className="mt-1 rounded-full p-1 transition-colors bg-gray-100 text-gray-400 hover:bg-gray-200"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium text-sm">{task.title}</h4>
+                          <div className="flex items-center gap-1">
+                            <Badge variant={getPriorityColor(task.priority)} className="text-xs">
+                              {task.priority}
+                            </Badge>
+                          </div>
+                        </div>
+                        {task.description && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {task.description}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Subject: {task.subject}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

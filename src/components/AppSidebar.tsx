@@ -24,14 +24,13 @@ import {
 const mainItems = [
   { title: "Home", url: "/", icon: Home },
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Todo Calendar", url: "/todo-demo", icon: Calendar },
 ];
 
 const toolsItems = [
-  { title: "Tasks", url: "/tasks", icon: CheckSquare },
+  { title: "Tasks & Calendar", url: "/tasks", icon: CheckSquare },
+  { title: "Notes & Documents", url: "/notes", icon: FileText },
   { title: "Files", url: "/files", icon: FolderOpen },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
-  { title: "Notes", url: "/notes", icon: FileText },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 

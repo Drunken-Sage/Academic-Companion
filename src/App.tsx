@@ -7,7 +7,7 @@ import { ThemeProvider } from "@/lib/theme-provider";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
-import TodoDemo from "./pages/TodoDemo";
+
 import Tasks from "./pages/Tasks";
 import Files from "./pages/Files";
 import Analytics from "./pages/Analytics";
@@ -28,7 +28,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<DashboardLayout><Dashboard /></DashboardLayout>} />
-          <Route path="/todo-demo" element={<DashboardLayout><TodoDemo /></DashboardLayout>} />
+          
           <Route path="/tasks" element={<DashboardLayout><Tasks /></DashboardLayout>} />
           <Route path="/files" element={<DashboardLayout><Files /></DashboardLayout>} />
           <Route path="/analytics" element={<DashboardLayout><Analytics /></DashboardLayout>} />

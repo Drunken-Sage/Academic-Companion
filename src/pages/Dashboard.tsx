@@ -498,7 +498,6 @@ const Dashboard = () => {
                 {pendingTasks.slice(0, 5).map((task) => (
                   <div key={task.id} className="flex items-center justify-between p-3 rounded-lg border">
                     <div className="flex items-center gap-3">
-                      <div className="w-4 h-4 border-2 border-muted-foreground rounded" />
                       <div>
                         <p className="text-sm font-medium">{task.title}</p>
                         <p className="text-xs text-muted-foreground">
@@ -528,24 +527,32 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {['Mathematics', 'Computer Science', 'Physics', 'History'].map((subject) => {
-                  const subjectTime = studySessions
-                    .filter(session => session.subject === subject)
-                    .reduce((total, session) => total + session.duration, 0);
-                  const percentage = totalStudyTime > 0 ? (subjectTime / totalStudyTime) * 100 : 0;
-
-                  return (
-                    <div key={subject} className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>{subject}</span>
-                        <span className="text-muted-foreground">
-                          {Math.round(subjectTime / 60)}h ({Math.round(percentage)}%)
-                        </span>
+                {studySessions.length > 0 ? (
+                  // Group by subject and calculate study time
+                  Object.entries(
+                    studySessions.reduce((acc, session) => {
+                      acc[session.subject] = (acc[session.subject] || 0) + session.duration;
+                      return acc;
+                    }, {} as Record<string, number>)
+                  ).map(([subject, time]) => {
+                    const percentage = totalStudyTime > 0 ? (time / totalStudyTime) * 100 : 0;
+                    return (
+                      <div key={subject} className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>{subject}</span>
+                          <span className="text-muted-foreground">
+                            {Math.round(time / 60)}h ({Math.round(percentage)}%)
+                          </span>
+                        </div>
+                        <Progress value={percentage} className="h-1" />
                       </div>
-                      <Progress value={percentage} className="h-1" />
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No study sessions recorded yet
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
