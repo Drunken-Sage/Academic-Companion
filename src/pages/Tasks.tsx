@@ -128,7 +128,7 @@ const Tasks = () => {
       } else {
         const courseNames = data.map(course => course.course_name);
         setSubjects(['All', ...courseNames]);
-        
+
         // If no courses, provide default subjects
         if (courseNames.length === 0) {
           setSubjects(['All', 'General', 'Assignment', 'Project']);
@@ -280,7 +280,7 @@ const Tasks = () => {
           dueDate: data.due_date,
           createdAt: new Date(data.created_at).toISOString().split('T')[0]
         };
-        
+
         setTasks(prev => [formattedTask, ...prev]);
         setNewTask({ title: '', description: '', subject: '', priority: 'medium', dueDate: '' });
         setIsDialogOpen(false);
@@ -479,15 +479,15 @@ const Tasks = () => {
         <TabsContent value="all">
           {filteredTasks.map(task => <TaskCard key={task.id} task={task} />)}
         </TabsContent>
-        
+
         <TabsContent value="pending">
           {tasksByStatus.pending.map(task => <TaskCard key={task.id} task={task} />)}
         </TabsContent>
-        
+
         <TabsContent value="in-progress">
           {tasksByStatus['in-progress'].map(task => <TaskCard key={task.id} task={task} />)}
         </TabsContent>
-        
+
         <TabsContent value="completed">
           {tasksByStatus.completed.map(task => <TaskCard key={task.id} task={task} />)}
         </TabsContent>
@@ -516,8 +516,8 @@ const Tasks = () => {
                     hasTasks: getDaysWithTasks()
                   }}
                   modifiersStyles={{
-                    hasTasks: { 
-                      backgroundColor: 'hsl(var(--primary))', 
+                    hasTasks: {
+                      backgroundColor: 'hsl(var(--primary))',
                       color: 'hsl(var(--primary-foreground))',
                       fontWeight: 'bold'
                     }

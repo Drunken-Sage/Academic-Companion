@@ -225,7 +225,7 @@ const Files = () => {
       />
 
       {/* Upload Zone */}
-      <Card 
+      <Card
         className="mb-6 border-dashed border-2 hover:border-primary transition-colors cursor-pointer"
         onDrop={handleDrop}
         onDragOver={handleDragOver}
@@ -322,8 +322,8 @@ const Files = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <FilePreview file={file} />
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       asChild
                     >
@@ -331,8 +331,8 @@ const Files = () => {
                         <Download className="h-4 w-4" />
                       </a>
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => deleteFile(file.id, file.storage_path)}
                     >

@@ -8,7 +8,7 @@ const Hero = () => {
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-hero" />
-      
+
       {/* Content */}
       <div className="container relative z-10 text-center space-y-8 py-20">
         <div className="space-y-4">
@@ -20,7 +20,7 @@ const Hero = () => {
             Companion
           </h1>
           <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-            Organize your files, manage your tasks, and track your progress with powerful analytics. 
+            Organize your files, manage your tasks, and track your progress with powerful analytics.
             Everything you need to excel in your academic journey.
           </p>
         </div>

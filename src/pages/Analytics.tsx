@@ -117,7 +117,7 @@ const Analytics = () => {
           title: "Success",
           description: "Study session created successfully"
         });
-        
+
         // Reset form
         setNewSession({
           subject: '',
@@ -285,8 +285,8 @@ const Analytics = () => {
                 <Button onClick={createStudySession} className="flex-1">
                   Create Session
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setIsSessionDialogOpen(false)}
                   className="flex-1"
                 >

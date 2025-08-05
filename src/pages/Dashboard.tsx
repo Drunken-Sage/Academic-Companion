@@ -9,11 +9,11 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from '@supabase/supabase-js';
-import { 
+import {
   LayoutDashboard,
-  CheckCircle2, 
-  Clock, 
-  TrendingUp, 
+  CheckCircle2,
+  Clock,
+  TrendingUp,
   Calendar,
   FileText,
   Target,

@@ -23,7 +23,7 @@ const FilePreview = ({ file }: FilePreviewProps) => {
   const [loading, setLoading] = useState(false);
 
   const isImage = file.mime_type.startsWith('image/');
-  const isText = file.mime_type.startsWith('text/') || 
+  const isText = file.mime_type.startsWith('text/') ||
                  file.mime_type === 'application/json' ||
                  file.display_name.endsWith('.md') ||
                  file.display_name.endsWith('.txt') ||
@@ -57,7 +57,7 @@ const FilePreview = ({ file }: FilePreviewProps) => {
 
   const handlePreview = async () => {
     setIsOpen(true);
-    
+
     if (isText && !fileContent) {
       setLoading(true);
       try {
@@ -68,11 +68,11 @@ const FilePreview = ({ file }: FilePreviewProps) => {
             'Accept': 'text/plain, text/*, application/json'
           }
         });
-        
+
         if (!response.ok) {
           throw new Error(`Failed to fetch file: ${response.statusText}`);
         }
-        
+
         const text = await response.text();
         setFileContent(text);
       } catch (error) {
@@ -88,8 +88,8 @@ const FilePreview = ({ file }: FilePreviewProps) => {
     if (isImage) {
       return (
         <div className="flex justify-center">
-          <img 
-            src={file.url} 
+          <img
+            src={file.url}
             alt={file.display_name}
             className="max-w-full max-h-96 object-contain rounded-lg"
           />
@@ -101,7 +101,7 @@ const FilePreview = ({ file }: FilePreviewProps) => {
       if (loading) {
         return <div className="text-center py-8">Loading file content...</div>;
       }
-      
+
       return (
         <ScrollArea className="h-96 w-full rounded-md border p-4">
           <pre className="text-sm font-mono whitespace-pre-wrap break-words">
@@ -138,8 +138,8 @@ const FilePreview = ({ file }: FilePreviewProps) => {
 
   return (
     <>
-      <Button 
-        variant="outline" 
+      <Button
+        variant="outline"
         size="sm"
         onClick={handlePreview}
       >
@@ -152,16 +152,16 @@ const FilePreview = ({ file }: FilePreviewProps) => {
             <DialogTitle className="flex items-center justify-between">
               <span>{file.display_name}</span>
               <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={downloadFile}
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Download
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => setIsOpen(false)}
                 >
@@ -170,7 +170,7 @@ const FilePreview = ({ file }: FilePreviewProps) => {
               </div>
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="mt-4">
             {renderPreview()}
           </div>

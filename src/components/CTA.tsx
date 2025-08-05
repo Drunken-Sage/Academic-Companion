@@ -6,7 +6,7 @@ function CTA(){
     <section className="py-24 relative overflow-hidden">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-primary opacity-5" />
-      
+
       <div className="container text-center space-y-8 relative z-10">
         {/* Social proof */}
         <div className="flex items-center justify-center space-x-1 text-primary mb-4">

@@ -190,7 +190,7 @@ const Notes = () => {
       } else {
         const courseNames = data.map(course => course.course_name);
         setSubjects(['All', ...courseNames]);
-        
+
         // If no courses, provide default subjects
         if (courseNames.length === 0) {
           setSubjects(['All', 'General', 'Study Notes', 'Research']);

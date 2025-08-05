@@ -7,14 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -165,7 +165,7 @@ const TodoCalendar = () => {
 
       if (error) throw error;
 
-      setTodos(prev => prev.map(t => 
+      setTodos(prev => prev.map(t =>
         t.id === id ? { ...t, completed: !t.completed } : t
       ));
 
@@ -335,8 +335,8 @@ const TodoCalendar = () => {
                     hasTodos: getDaysWithTodos()
                   }}
                   modifiersStyles={{
-                    hasTodos: { 
-                      backgroundColor: 'hsl(var(--primary))', 
+                    hasTodos: {
+                      backgroundColor: 'hsl(var(--primary))',
                       color: 'hsl(var(--primary-foreground))',
                       fontWeight: 'bold'
                     }
@@ -366,8 +366,8 @@ const TodoCalendar = () => {
                         onClick={() => toggleTodo(todo.id)}
                         className={cn(
                           "mt-1 rounded-full p-1 transition-colors",
-                          todo.completed 
-                            ? "bg-green-100 text-green-600" 
+                          todo.completed
+                            ? "bg-green-100 text-green-600"
                             : "bg-gray-100 text-gray-400 hover:bg-gray-200"
                         )}
                       >
@@ -429,8 +429,8 @@ const TodoCalendar = () => {
                         onClick={() => toggleTodo(todo.id)}
                         className={cn(
                           "mt-1 rounded-full p-1 transition-colors",
-                          todo.completed 
-                            ? "bg-green-100 text-green-600" 
+                          todo.completed
+                            ? "bg-green-100 text-green-600"
                             : "bg-gray-100 text-gray-400 hover:bg-gray-200"
                         )}
                       >
