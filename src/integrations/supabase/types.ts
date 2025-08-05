@@ -223,6 +223,7 @@ export type Database = {
       }
       user_files: {
         Row: {
+          course: string | null
           created_at: string
           display_name: string
           file_size: number | null
@@ -230,10 +231,12 @@ export type Database = {
           mime_type: string | null
           original_name: string
           storage_path: string
+          tags: string[] | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          course?: string | null
           created_at?: string
           display_name: string
           file_size?: number | null
@@ -241,10 +244,12 @@ export type Database = {
           mime_type?: string | null
           original_name: string
           storage_path: string
+          tags?: string[] | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          course?: string | null
           created_at?: string
           display_name?: string
           file_size?: number | null
@@ -252,6 +257,7 @@ export type Database = {
           mime_type?: string | null
           original_name?: string
           storage_path?: string
+          tags?: string[] | null
           updated_at?: string
           user_id?: string
         }

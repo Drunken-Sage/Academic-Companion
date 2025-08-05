@@ -37,6 +37,8 @@ interface UploadedFile {
   storage_path: string;
   url: string;
   created_at: string;
+  course?: string;
+  tags: string[];
 }
 
 // Subjects will be loaded from user courses
@@ -53,11 +55,18 @@ const Notes = () => {
   const [selectedFile, setSelectedFile] = useState<UploadedFile | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isFileEditorOpen, setIsFileEditorOpen] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [editingNote, setEditingNote] = useState({
     title: '',
     content: '',
     subject: '',
+    tags: [] as string[],
+    newTag: ''
+  });
+  const [editingFile, setEditingFile] = useState({
+    display_name: '',
+    course: '',
     tags: [] as string[],
     newTag: ''
   });
@@ -154,6 +163,7 @@ const Notes = () => {
         return {
           ...file,
           url: publicUrl,
+          tags: file.tags || [],
         };
       });
 
@@ -370,6 +380,79 @@ const Notes = () => {
     }));
   };
 
+  const openFileEditor = (file: UploadedFile) => {
+    setEditingFile({
+      display_name: file.display_name,
+      course: file.course || '',
+      tags: [...file.tags],
+      newTag: ''
+    });
+    setSelectedFile(file);
+    setIsFileEditorOpen(true);
+  };
+
+  const saveFile = async () => {
+    if (!editingFile.display_name || !selectedFile || !user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('user_files')
+        .update({
+          display_name: editingFile.display_name,
+          course: editingFile.course || null,
+          tags: editingFile.tags
+        })
+        .eq('id', selectedFile.id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        toast({
+          title: "Error updating document",
+          description: error.message,
+          variant: "destructive"
+        });
+      } else {
+        const updatedFile = {
+          ...selectedFile,
+          display_name: data.display_name,
+          course: data.course,
+          tags: data.tags || []
+        };
+
+        setFiles(prev => prev.map(file =>
+          file.id === selectedFile.id ? updatedFile : file
+        ));
+        setSelectedFile(updatedFile);
+        toast({
+          title: "Document updated",
+          description: "Document has been successfully updated.",
+        });
+        setIsFileEditorOpen(false);
+      }
+    } catch (error) {
+      console.error('Error saving file:', error);
+    }
+  };
+
+  const addFileTag = () => {
+    if (editingFile.newTag && !editingFile.tags.includes(editingFile.newTag)) {
+      setEditingFile(prev => ({
+        ...prev,
+        tags: [...prev.tags, prev.newTag],
+        newTag: ''
+      }));
+    }
+  };
+
+  const removeFileTag = (tagToRemove: string) => {
+    setEditingFile(prev => ({
+      ...prev,
+      tags: prev.tags.filter(tag => tag !== tagToRemove)
+    }));
+  };
+
   const uploadFile = async (file: File) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -487,9 +570,12 @@ const Notes = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const filteredFiles = files.filter(file =>
-    file.display_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredFiles = files.filter(file => {
+    const matchesSearch = file.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         file.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesCourse = selectedSubject === 'All' || file.course === selectedSubject;
+    return matchesSearch && matchesCourse;
+  });
 
   if (loading) {
     return (
@@ -697,6 +783,16 @@ const Notes = () => {
                     className="pl-10"
                   />
                 </div>
+                <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subjects.map(subject => (
+                      <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Drop Zone */}
@@ -730,6 +826,16 @@ const Notes = () => {
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openFileEditor(file);
+                            }}
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             asChild
                             onClick={(e) => e.stopPropagation()}
                           >
@@ -753,6 +859,26 @@ const Notes = () => {
                         <span className="text-xs text-muted-foreground">{file.mime_type}</span>
                         <span className="text-xs text-muted-foreground">{formatFileSize(file.file_size)}</span>
                       </div>
+                      {file.course && (
+                        <div className="mt-1">
+                          <Badge variant="outline" className="text-xs">{file.course}</Badge>
+                        </div>
+                      )}
+                      {file.tags.length > 0 && (
+                        <div className="flex gap-1 mt-1 flex-wrap">
+                          {file.tags.slice(0, 2).map(tag => (
+                            <Badge key={tag} variant="secondary" className="text-xs">
+                              <Tag className="h-3 w-3 mr-1" />
+                              {tag}
+                            </Badge>
+                          ))}
+                          {file.tags.length > 2 && (
+                            <Badge variant="secondary" className="text-xs">
+                              +{file.tags.length - 2}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                       <div className="flex items-center gap-1 mt-2">
                         <Clock className="h-3 w-3 text-muted-foreground" />
                         <span className="text-xs text-muted-foreground">
@@ -775,6 +901,7 @@ const Notes = () => {
                         <CardTitle className="text-xl">{selectedFile.display_name}</CardTitle>
                         <div className="flex items-center gap-2 mt-2">
                           <Badge variant="outline">{selectedFile.mime_type}</Badge>
+                          {selectedFile.course && <Badge variant="outline">{selectedFile.course}</Badge>}
                           <span className="text-sm text-muted-foreground">
                             {formatFileSize(selectedFile.file_size)}
                           </span>
@@ -784,6 +911,10 @@ const Notes = () => {
                         </div>
                       </div>
                       <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => openFileEditor(selectedFile)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
                         <FilePreview file={selectedFile} />
                         <Button variant="outline" asChild>
                           <a href={selectedFile.url} download={selectedFile.display_name}>
@@ -793,6 +924,16 @@ const Notes = () => {
                         </Button>
                       </div>
                     </div>
+                    {selectedFile.tags.length > 0 && (
+                      <div className="flex gap-1 mt-2 flex-wrap">
+                        {selectedFile.tags.map(tag => (
+                          <Badge key={tag} variant="secondary" className="text-xs">
+                            <Tag className="h-3 w-3 mr-1" />
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </CardHeader>
                   <Separator />
                   <CardContent className="p-6">
@@ -899,6 +1040,83 @@ const Notes = () => {
               <Button onClick={saveNote}>
                 <Save className="h-4 w-4 mr-2" />
                 Save Note
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* File Editor Dialog */}
+      <Dialog open={isFileEditorOpen} onOpenChange={setIsFileEditorOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Document</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="display_name">Display Name</Label>
+              <Input
+                id="display_name"
+                value={editingFile.display_name}
+                onChange={(e) => setEditingFile(prev => ({ ...prev, display_name: e.target.value }))}
+                placeholder="Enter document name..."
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="course">Course</Label>
+              <Select
+                value={editingFile.course}
+                onValueChange={(value) => setEditingFile(prev => ({ ...prev, course: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a course" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No course</SelectItem>
+                  {subjects.slice(1).map(subject => (
+                    <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Tags</Label>
+              <div className="flex gap-2 mb-2">
+                <Input
+                  value={editingFile.newTag}
+                  onChange={(e) => setEditingFile(prev => ({ ...prev, newTag: e.target.value }))}
+                  placeholder="Add a tag..."
+                  onKeyPress={(e) => e.key === 'Enter' && addFileTag()}
+                />
+                <Button onClick={addFileTag} variant="outline">Add Tag</Button>
+              </div>
+              <div className="flex gap-1 flex-wrap">
+                {editingFile.tags.map(tag => (
+                  <Badge key={tag} variant="secondary" className="text-xs">
+                    <Tag className="h-3 w-3 mr-1" />
+                    {tag}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="ml-1 h-auto p-0"
+                      onClick={() => removeFileTag(tag)}
+                    >
+                      ×
+                    </Button>
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsFileEditorOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={saveFile}>
+                <Save className="h-4 w-4 mr-2" />
+                Save Changes
               </Button>
             </div>
           </div>

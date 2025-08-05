@@ -24,6 +24,7 @@ interface Profile {
   user_id: string;
   display_name: string | null;
   major: string | null;
+  weekly_study_goal?: number;
 }
 
 const Settings = () => {
@@ -33,6 +34,7 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [newCourse, setNewCourse] = useState({ name: '', code: '', instructor: '', semester: '' });
   const [isAddingCourse, setIsAddingCourse] = useState(false);
+  const [weeklyGoal, setWeeklyGoal] = useState<number>(40);
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
 
@@ -58,6 +60,7 @@ const Settings = () => {
         console.error('Error fetching profile:', profileError);
       } else {
         setProfile(profileData);
+        setWeeklyGoal(profileData.weekly_study_goal || 40);
       }
 
       // Fetch courses
@@ -105,6 +108,38 @@ const Settings = () => {
       toast({
         title: "An error occurred",
         description: "Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const updateWeeklyGoal = async () => {
+    if (!user || !profile) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ weekly_study_goal: weeklyGoal })
+        .eq('user_id', user.id);
+
+      if (error) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive"
+        });
+      } else {
+        setProfile(prev => prev ? { ...prev, weekly_study_goal: weeklyGoal } : null);
+        toast({
+          title: "Success",
+          description: "Weekly study goal updated successfully"
+        });
+      }
+    } catch (error) {
+      console.error('Error updating weekly goal:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update weekly study goal",
         variant: "destructive"
       });
     }
@@ -266,6 +301,41 @@ const Settings = () => {
                 checked={theme === 'dark'}
                 onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Study Goals */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <SettingsIcon className="h-5 w-5" />
+              Study Goals
+            </CardTitle>
+            <CardDescription>
+              Set your weekly study goals and targets.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="weekly-goal">Weekly Study Goal (hours)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="weekly-goal"
+                  type="number"
+                  min="1"
+                  max="168"
+                  value={weeklyGoal}
+                  onChange={(e) => setWeeklyGoal(Number(e.target.value))}
+                  placeholder="40"
+                />
+                <Button onClick={updateWeeklyGoal} variant="outline">
+                  Save
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Set your target number of study hours per week. This will be used in your analytics dashboard.
+              </p>
             </div>
           </CardContent>
         </Card>
