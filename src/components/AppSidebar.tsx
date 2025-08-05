@@ -29,7 +29,6 @@ const mainItems = [
 const toolsItems = [
   { title: "Tasks & Calendar", url: "/tasks", icon: CheckSquare },
   { title: "Notes & Documents", url: "/notes", icon: FileText },
-  { title: "Files", url: "/files", icon: FolderOpen },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Settings", url: "/settings", icon: Settings },
 ];

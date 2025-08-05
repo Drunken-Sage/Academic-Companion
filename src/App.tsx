@@ -9,7 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 
 import Tasks from "./pages/Tasks";
-import Files from "./pages/Files";
+
 import Analytics from "./pages/Analytics";
 import Notes from "./pages/Notes";
 import Settings from "./pages/Settings";
@@ -30,7 +30,6 @@ const App = () => (
           <Route path="/dashboard" element={<DashboardLayout><Dashboard /></DashboardLayout>} />
           
           <Route path="/tasks" element={<DashboardLayout><Tasks /></DashboardLayout>} />
-          <Route path="/files" element={<DashboardLayout><Files /></DashboardLayout>} />
           <Route path="/analytics" element={<DashboardLayout><Analytics /></DashboardLayout>} />
           <Route path="/notes" element={<DashboardLayout><Notes /></DashboardLayout>} />
           <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />

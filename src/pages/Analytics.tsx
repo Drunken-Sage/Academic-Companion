@@ -277,6 +277,8 @@ const Analytics = () => {
                   type="date"
                   value={newSession.session_date}
                   onChange={(e) => setNewSession(prev => ({ ...prev, session_date: e.target.value }))}
+                  min={format(startOfWeek(new Date()), 'yyyy-MM-dd')}
+                  max={format(endOfWeek(new Date()), 'yyyy-MM-dd')}
                 />
               </div>
               <div className="flex gap-2 pt-4">
@@ -353,7 +355,11 @@ const Analytics = () => {
                 <XAxis dataKey="subject" />
                 <YAxis />
                 <Tooltip formatter={(value) => [`${Number(value).toFixed(1)}h`, 'Study Time']} />
-                <Bar dataKey="hours" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="hours" radius={[4, 4, 0, 0]}>
+                  {timePerSubjectData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -456,13 +462,6 @@ const Analytics = () => {
               <Progress value={goalCompletionRate} className="h-2" />
             </div>
 
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium">Total Notes</span>
-                <span className="text-sm text-muted-foreground">{timePerSubjectData.length} subjects</span>
-              </div>
-              <Progress value={Math.min((timePerSubjectData.length / 5) * 100, 100)} className="h-2" />
-            </div>
 
             <div className="pt-4 border-t">
               <div className="text-center">
