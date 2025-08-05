@@ -1,0 +1,67 @@
+import { BookOpen, Github, Twitter, Linkedin } from "lucide-react";
+
+const Footer = () => {
+  const links = {
+    product: [
+      { name: "Features", href: "#features" },
+      { name: "Pricing", href: "#pricing" },
+      { name: "Updates", href: "#updates" },
+      { name: "Beta", href: "#beta" }
+    ],
+    company: [
+      { name: "About", href: "#about" },
+      { name: "Blog", href: "#blog" },
+      { name: "Careers", href: "#careers" },
+      { name: "Contact", href: "#contact" }
+    ],
+    resources: [
+      { name: "Documentation", href: "#docs" },
+      { name: "Help Center", href: "#help" },
+      { name: "Community", href: "#community" },
+      { name: "Status", href: "#status" }
+    ],
+    legal: [
+      { name: "Privacy", href: "#privacy" },
+      { name: "Terms", href: "#terms" },
+      { name: "Security", href: "#security" },
+      { name: "Cookies", href: "#cookies" }
+    ]
+  };
+
+  return (
+    <footer className="bg-background border-t border-border/40">
+      <div className="container py-8">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-8">
+          {/* Brand */}
+          <div className="col-span-2 space-y-4">
+            <div className="flex items-center space-x-2">
+              <BookOpen className="h-8 w-8 text-primary" />
+              <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                StudyFlow
+              </span>
+            </div>
+            <p className="text-muted-foreground max-w-xs">
+              The ultimate academic companion for students and researchers worldwide.
+            </p>
+            <div className="flex space-x-4">
+              <Github className="h-5 w-5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors" />
+              <Twitter className="h-5 w-5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors" />
+              <Linkedin className="h-5 w-5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors" />
+            </div>
+          </div>
+        </div>
+
+        <div className="border-border/40 mt-2 flex flex-col md:flex-row justify-between items-center">
+          <p className="text-muted-foreground text-sm">
+            © 2024 StudyFlow. All rights reserved.
+          </p>
+          <p className="text-muted-foreground text-sm mt-4 md:mt-0">
+            Made with ❤️ for students everywhere
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
+};
+
+export default Footer;
