@@ -47,6 +47,7 @@ interface Profile {
   user_id: string;
   display_name: string | null;
   major: string | null;
+  weekly_study_goal: number | null;
 }
 
 const Dashboard = () => {
@@ -60,6 +61,7 @@ const Dashboard = () => {
   // Real data from Supabase
   const [tasks, setTasks] = useState<Task[]>([]);
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
+  const [showAllSessions, setShowAllSessions] = useState(false);
 
   useEffect(() => {
     // Set up auth state listener
@@ -259,7 +261,9 @@ const Dashboard = () => {
   const overdueTasks = tasks.filter(task => task.dueDate < new Date() && !task.completed);
 
   const totalStudyTime = studySessions.reduce((total, session) => total + session.duration, 0);
-  const weeklyGoal = 1200; // 20 hours in minutes
+  // Use weekly_study_goal from profile (in hours), convert to minutes, fallback to 20 hours
+  const weeklyGoalHours = profile?.weekly_study_goal || 20;
+  const weeklyGoal = weeklyGoalHours * 60; // Convert hours to minutes
   const progressPercentage = Math.min((totalStudyTime / weeklyGoal) * 100, 100);
 
   const getPriorityColor = (priority: Task['priority']) => {
@@ -498,20 +502,36 @@ const Dashboard = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <h4 className="font-medium text-sm">Recent Sessions</h4>
-                  {studySessions.slice(0, 3).map((session) => (
-                    <div key={session.id} className="flex justify-between items-center p-2 rounded border">
-                      <div>
-                        <p className="font-medium text-sm">{session.subject}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(session.date, 'MMM d')}
-                        </p>
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-sm">
+                      {showAllSessions ? 'All Sessions' : 'Recent Sessions'}
+                    </h4>
+                    {studySessions.length > 3 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowAllSessions(!showAllSessions)}
+                        className="text-xs h-auto p-1"
+                      >
+                        {showAllSessions ? 'Show Less' : 'Show All'}
+                      </Button>
+                    )}
+                  </div>
+                  <div className={`space-y-2 ${showAllSessions ? 'max-h-64 overflow-y-auto' : ''}`}>
+                    {(showAllSessions ? studySessions : studySessions.slice(0, 3)).map((session) => (
+                      <div key={session.id} className="flex justify-between items-center p-2 rounded border">
+                        <div>
+                          <p className="font-medium text-sm">{session.subject}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(session.date, 'MMM d, yyyy')}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">
+                          {session.duration}min
+                        </Badge>
                       </div>
-                      <Badge variant="secondary">
-                        {session.duration}min
-                      </Badge>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </>
             )}
