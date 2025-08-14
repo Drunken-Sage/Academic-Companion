@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfWeek, endOfWeek, subDays } from "date-fns";
-import { Plus } from "lucide-react";
+import { format, startOfWeek, endOfWeek, subDays, differenceInDays, isAfter, isBefore } from "date-fns";
+import { Plus, BookOpen, AlertTriangle, TrendingUp, Clock } from "lucide-react";
 
 interface StudySession {
   id: string;
@@ -27,10 +28,15 @@ interface Task {
   due_date: string;
 }
 
+interface Profile {
+  weekly_study_goal: number;
+}
+
 const Analytics = () => {
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [userCourses, setUserCourses] = useState<string[]>([]);
+  const [weeklyGoal, setWeeklyGoal] = useState<number>(40);
   const [loading, setLoading] = useState(true);
   const [isSessionDialogOpen, setIsSessionDialogOpen] = useState(false);
   const [newSession, setNewSession] = useState({
@@ -70,6 +76,15 @@ const Analytics = () => {
 
         const courseNames = coursesData?.map(course => course.course_name) || [];
         setUserCourses(courseNames);
+
+        // Fetch user's weekly study goal
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('weekly_study_goal')
+          .eq('user_id', user.id)
+          .single();
+
+        setWeeklyGoal(profileData?.weekly_study_goal || 40);
 
         setStudySessions(sessions || []);
         setTasks(tasksData || []);
@@ -198,7 +213,6 @@ const Analytics = () => {
   ] : [];
 
   const totalStudyHours = timePerSubjectData.reduce((sum, item) => sum + item.hours, 0);
-  const weeklyGoal = 40; // hours
   const actualHours = dailyStudyTimeData.reduce((sum, item) => sum + item.hours, 0);
   const goalCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
@@ -434,6 +448,144 @@ const Analytics = () => {
           </CardContent>
         </Card>
 
+        {/* Revision Suggestions */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              Revision Suggestions
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">Subjects you should focus on next</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {(() => {
+              // Calculate least studied subjects based on recent study time
+              const subjectStudyTime = timePerSubjectData.reduce((acc, item) => {
+                acc[item.subject] = item.hours;
+                return acc;
+              }, {} as Record<string, number>);
+
+              // Get all user courses and calculate which need more attention
+              const suggestions = userCourses
+                .map(course => ({
+                  subject: course,
+                  hoursThisWeek: subjectStudyTime[course] || 0,
+                  priority: subjectStudyTime[course] || 0 < 2 ? 'high' : subjectStudyTime[course] < 4 ? 'medium' : 'low'
+                }))
+                .sort((a, b) => a.hoursThisWeek - b.hoursThisWeek)
+                .slice(0, 3);
+
+              if (suggestions.length === 0) {
+                return (
+                  <p className="text-muted-foreground text-center py-4">
+                    No courses found. Add courses in your profile to get revision suggestions.
+                  </p>
+                );
+              }
+
+              return suggestions.map((suggestion, index) => (
+                <div key={suggestion.subject} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div>
+                    <div className="font-medium">{suggestion.subject}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {suggestion.hoursThisWeek.toFixed(1)}h this week
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge 
+                      variant={suggestion.priority === 'high' ? 'destructive' : suggestion.priority === 'medium' ? 'default' : 'secondary'}
+                    >
+                      {suggestion.priority} priority
+                    </Badge>
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+              ));
+            })()}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        {/* Task Urgency Predictions */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Task Urgency Predictions
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">Tasks requiring immediate attention</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {(() => {
+              const now = new Date();
+              const urgentTasks = tasks
+                .filter(task => task.status !== 'completed')
+                .map(task => {
+                  const dueDate = new Date(task.due_date);
+                  const daysUntilDue = differenceInDays(dueDate, now);
+                  let urgency = 'low';
+                  let urgencyColor = 'secondary';
+                  
+                  if (daysUntilDue < 0) {
+                    urgency = 'overdue';
+                    urgencyColor = 'destructive';
+                  } else if (daysUntilDue <= 1) {
+                    urgency = 'critical';
+                    urgencyColor = 'destructive';
+                  } else if (daysUntilDue <= 3) {
+                    urgency = 'high';
+                    urgencyColor = 'default';
+                  } else if (daysUntilDue <= 7) {
+                    urgency = 'medium';
+                    urgencyColor = 'secondary';
+                  }
+
+                  return {
+                    ...task,
+                    daysUntilDue,
+                    urgency,
+                    urgencyColor
+                  };
+                })
+                .sort((a, b) => a.daysUntilDue - b.daysUntilDue)
+                .slice(0, 5);
+
+              if (urgentTasks.length === 0) {
+                return (
+                  <p className="text-muted-foreground text-center py-4">
+                    No pending tasks found. Great job staying on top of your work!
+                  </p>
+                );
+              }
+
+              return urgentTasks.map((task) => (
+                <div key={task.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex-1">
+                    <div className="font-medium">{task.title}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {task.subject} • Due: {format(new Date(task.due_date), 'MMM dd')}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={task.urgencyColor as any}>
+                      {task.urgency === 'overdue' 
+                        ? `${Math.abs(task.daysUntilDue)} days overdue`
+                        : task.daysUntilDue === 0 
+                        ? 'Due today'
+                        : task.daysUntilDue === 1
+                        ? 'Due tomorrow'
+                        : `${task.daysUntilDue} days left`
+                      }
+                    </Badge>
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+              ));
+            })()}
+          </CardContent>
+        </Card>
+
         {/* Goal Completion Rate */}
         <Card>
           <CardHeader>
@@ -461,7 +613,6 @@ const Analytics = () => {
               </div>
               <Progress value={goalCompletionRate} className="h-2" />
             </div>
-
 
             <div className="pt-4 border-t">
               <div className="text-center">

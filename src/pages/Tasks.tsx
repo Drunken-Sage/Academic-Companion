@@ -39,6 +39,7 @@ const Tasks = () => {
   const [selectedSubject, setSelectedSubject] = useState('All');
   const [selectedPriority, setSelectedPriority] = useState('All');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -347,6 +348,11 @@ const Tasks = () => {
     return tasks.filter(task => isSameDay(new Date(task.dueDate), date));
   };
 
+  const getSelectedDayTasks = (): Task[] => {
+    if (!selectedDate) return [];
+    return getDayTasks(selectedDate);
+  };
+
   const getDaysWithTasks = (): Date[] => {
     return tasks.map(task => startOfDay(new Date(task.dueDate)));
   };
@@ -510,7 +516,8 @@ const Tasks = () => {
               <CardContent>
                 <CalendarComponent
                   mode="single"
-                  selected={new Date()}
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
                   className="rounded-md"
                   modifiers={{
                     hasTasks: getDaysWithTasks()
@@ -526,22 +533,22 @@ const Tasks = () => {
               </CardContent>
             </Card>
 
-            {/* Today's Tasks */}
+            {/* Selected Day Tasks */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Clock className="h-5 w-5" />
-                  Today's Tasks
+                  {selectedDate ? format(selectedDate, 'MMM dd, yyyy') : 'Select a date'}
                 </CardTitle>
                 <CardDescription>
-                  {getDayTasks(new Date()).length} task(s) due today
+                  {getSelectedDayTasks().length} task(s) for this day
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {getDayTasks(new Date()).length === 0 ? (
-                  <p className="text-muted-foreground text-sm">No tasks due today</p>
+                {getSelectedDayTasks().length === 0 ? (
+                  <p className="text-muted-foreground text-sm">No tasks for this day</p>
                 ) : (
-                  getDayTasks(new Date()).map(task => (
+                  getSelectedDayTasks().map(task => (
                     <div key={task.id} className="flex items-start gap-3 p-3 rounded-lg border">
                       <button
                         onClick={() => toggleTaskStatus(task.id)}

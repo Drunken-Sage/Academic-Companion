@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { Upload, Search, FileText, Download, Trash2, FolderOpen } from "lucide-react";
+import { Upload, Search, FileText, Download, Trash2, FolderOpen, Edit2, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import FilePreview from "@/components/FilePreview";
@@ -17,6 +20,8 @@ interface UploadedFile {
   storage_path: string;
   url: string;
   created_at: string;
+  course?: string;
+  tags?: string[];
 }
 
 const Files = () => {
@@ -24,11 +29,16 @@ const Files = () => {
   const [loading, setLoading] = useState(true);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [userCourses, setUserCourses] = useState<string[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<string>('');
+  const [editingFile, setEditingFile] = useState<UploadedFile | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchFiles();
+    fetchCourses();
   }, []);
 
   const fetchFiles = async () => {
@@ -70,6 +80,22 @@ const Files = () => {
     }
   };
 
+  const fetchCourses = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: coursesData } = await supabase
+        .from('user_courses')
+        .select('course_name')
+        .eq('user_id', user.id);
+
+      setUserCourses(coursesData?.map(course => course.course_name) || []);
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+    }
+  };
+
   const uploadFile = async (file: File) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -101,7 +127,8 @@ const Files = () => {
           original_name: file.name,
           display_name: file.name,
           file_size: file.size,
-          mime_type: file.type || 'application/octet-stream'
+          mime_type: file.type || 'application/octet-stream',
+          course: selectedCourse || null
         });
 
       if (dbError) throw dbError;
@@ -169,6 +196,43 @@ const Files = () => {
     }
   };
 
+  const updateFileMetadata = async () => {
+    if (!editingFile) return;
+
+    try {
+      const { error } = await supabase
+        .from('user_files')
+        .update({
+          course: editingFile.course || null,
+          tags: editingFile.tags || []
+        })
+        .eq('id', editingFile.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "File updated successfully",
+      });
+
+      setIsEditDialogOpen(false);
+      setEditingFile(null);
+      fetchFiles();
+    } catch (error) {
+      console.error('Error updating file:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update file",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const openEditDialog = (file: UploadedFile) => {
+    setEditingFile(file);
+    setIsEditDialogOpen(true);
+  };
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files || []);
     selectedFiles.forEach(uploadFile);
@@ -223,6 +287,28 @@ const Files = () => {
         onChange={handleFileSelect}
         className="hidden"
       />
+
+      {/* Course Selection */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <Label htmlFor="course-select" className="text-sm font-medium mb-2 block">
+            Select course for uploaded files (optional)
+          </Label>
+          <Select value={selectedCourse} onValueChange={setSelectedCourse}>
+            <SelectTrigger>
+              <SelectValue placeholder="Choose a course or leave empty" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">No course</SelectItem>
+              {userCourses.map((course) => (
+                <SelectItem key={course} value={course}>
+                  {course}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
 
       {/* Upload Zone */}
       <Card
@@ -317,11 +403,32 @@ const Files = () => {
                         <span>{file.mime_type}</span>
                         <span>•</span>
                         <span>{new Date(file.created_at).toLocaleDateString()}</span>
+                        {file.course && (
+                          <>
+                            <span>•</span>
+                            <span className="text-primary font-medium">{file.course}</span>
+                          </>
+                        )}
                       </div>
+                      {file.tags && file.tags.length > 0 && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Tag className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">
+                            {file.tags.join(', ')}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <FilePreview file={file} />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditDialog(file)}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -345,6 +452,62 @@ const Files = () => {
           ))
         )}
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit File Details</DialogTitle>
+          </DialogHeader>
+          {editingFile && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="file-course">Course</Label>
+                <Select
+                  value={editingFile.course || ''}
+                  onValueChange={(value) => setEditingFile(prev => prev ? { ...prev, course: value || undefined } : null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a course or leave empty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No course</SelectItem>
+                    {userCourses.map((course) => (
+                      <SelectItem key={course} value={course}>
+                        {course}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="file-tags">Tags (comma separated)</Label>
+                <Input
+                  id="file-tags"
+                  value={editingFile.tags?.join(', ') || ''}
+                  onChange={(e) => setEditingFile(prev => prev ? { 
+                    ...prev, 
+                    tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+                  } : null)}
+                  placeholder="Enter tags separated by commas"
+                />
+              </div>
+              <div className="flex gap-2 pt-4">
+                <Button onClick={updateFileMetadata} className="flex-1">
+                  Update File
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsEditDialogOpen(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

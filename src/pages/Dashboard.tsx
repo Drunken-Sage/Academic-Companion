@@ -232,10 +232,11 @@ const Dashboard = () => {
           description: "Redirecting to notes page...",
         });
         break;
-      case 'schedule-event':
+      case 'create-study-session':
+        navigate('/analytics');
         toast({
-          title: "Schedule Event",
-          description: "Calendar feature coming soon!",
+          title: "Create Study Session",
+          description: "Redirecting to analytics page...",
         });
         break;
       default:
@@ -452,14 +453,70 @@ const Dashboard = () => {
               <Button
                 variant="outline"
                 className="w-full justify-start"
-                onClick={() => handleQuickAction('schedule-event')}
+                onClick={() => handleQuickAction('create-study-session')}
               >
                 <Calendar className="h-4 w-4 mr-2" />
-                Schedule Event
+                Create Study Session
               </Button>
             </CardContent>
           </Card>
         </div>
+
+        {/* Study Statistics */}
+        <Card className="lg:col-span-2 bg-background/50 backdrop-blur border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Study Statistics
+            </CardTitle>
+            <CardDescription>
+              Recent study sessions and subject breakdown
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {studySessions.length === 0 ? (
+              <div className="text-center py-8">
+                <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No study sessions yet</p>
+                <p className="text-sm text-muted-foreground">Start tracking your study time!</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-4 rounded-lg bg-accent/50">
+                    <div className="text-2xl font-bold text-primary">
+                      {studySessions.length}
+                    </div>
+                    <p className="text-sm text-muted-foreground">Sessions This Week</p>
+                  </div>
+                  <div className="text-center p-4 rounded-lg bg-accent/50">
+                    <div className="text-2xl font-bold text-primary">
+                      {Math.round(totalStudyTime / 60)}h
+                    </div>
+                    <p className="text-sm text-muted-foreground">Total Hours</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm">Recent Sessions</h4>
+                  {studySessions.slice(0, 3).map((session) => (
+                    <div key={session.id} className="flex justify-between items-center p-2 rounded border">
+                      <div>
+                        <p className="font-medium text-sm">{session.subject}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(session.date, 'MMM d')}
+                        </p>
+                      </div>
+                      <Badge variant="secondary">
+                        {session.duration}min
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Recent Tasks */}
         <Card className="bg-background/50 backdrop-blur border-border/50">
