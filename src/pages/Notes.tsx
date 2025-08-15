@@ -55,8 +55,10 @@ const Notes = () => {
   const [selectedFile, setSelectedFile] = useState<UploadedFile | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [isFileEditorOpen, setIsFileEditorOpen] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [uploadStatus, setUploadStatus] = useState<Record<string, 'uploading' | 'cancelled' | 'completed' | 'error'>>({});
   const [editingNote, setEditingNote] = useState({
     title: '',
     content: '',
@@ -73,6 +75,8 @@ const Notes = () => {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadAbortControllers, setUploadAbortControllers] = useState<Map<string, AbortController>>(new Map());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -228,6 +232,7 @@ const Notes = () => {
         newTag: ''
       });
       setIsEditing(true);
+      setEditingNoteId(note.id);
     } else {
       setEditingNote({
         title: '',
@@ -237,6 +242,7 @@ const Notes = () => {
         newTag: ''
       });
       setIsEditing(false);
+      setEditingNoteId(null);
     }
     setIsEditorOpen(true);
   };
@@ -245,7 +251,7 @@ const Notes = () => {
     if (!editingNote.title || !editingNote.content || !user) return;
 
     try {
-      if (isEditing && selectedNote) {
+      if (isEditing && editingNoteId) {
         // Update existing note
         const { data, error } = await supabase
           .from('notes')
@@ -255,7 +261,7 @@ const Notes = () => {
             subject: editingNote.subject,
             tags: editingNote.tags
           })
-          .eq('id', selectedNote.id)
+          .eq('id', editingNoteId)
           .eq('user_id', user.id)
           .select()
           .single();
@@ -279,9 +285,12 @@ const Notes = () => {
           };
 
           setNotes(prev => prev.map(note =>
-            note.id === selectedNote.id ? updatedNote : note
+            note.id === editingNoteId ? updatedNote : note
           ));
-          setSelectedNote(updatedNote);
+          // Update selectedNote if it's the same as the edited note
+          if (selectedNote?.id === editingNoteId) {
+            setSelectedNote(updatedNote);
+          }
           toast({
             title: "Note updated",
             description: "Your note has been successfully updated.",
@@ -456,7 +465,7 @@ const Notes = () => {
     }));
   };
 
-  const uploadFile = async (file: File, course?: string) => {
+  const uploadFile = async (file: File, course?: string, abortController?: AbortController) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
@@ -468,10 +477,34 @@ const Notes = () => {
 
       setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
 
+      // Simulate progress for better UX
+      const progressInterval = setInterval(() => {
+        if (abortController?.signal.aborted) {
+          clearInterval(progressInterval);
+          return;
+        }
+        setUploadProgress(prev => {
+          const current = prev[file.name] || 0;
+          if (current < 90) {
+            return { ...prev, [file.name]: current + 10 };
+          }
+          return prev;
+        });
+      }, 200);
+
       // Upload to storage
       const { data, error: uploadError } = await supabase.storage
         .from('user-files')
         .upload(storagePath, file);
+
+      clearInterval(progressInterval);
+
+      // Check if upload was cancelled during upload
+      if (abortController?.signal.aborted) {
+        // Clean up uploaded file if cancellation happened mid-upload
+        await supabase.storage.from('user-files').remove([storagePath]);
+        throw new Error('Upload cancelled');
+      }
 
       if (uploadError) throw uploadError;
 
@@ -491,28 +524,34 @@ const Notes = () => {
       if (dbError) throw dbError;
 
       setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
+      setUploadStatus(prev => ({ ...prev, [file.name]: 'completed' }));
       toast({
-        title: "Success",
-        description: `Document uploaded successfully${course ? ` to ${course}` : ''}`,
+        title: "Upload Complete",
+        description: `${file.name} uploaded successfully${course ? ` to ${course}` : ''}`,
       });
 
       // Refresh files list
       fetchFiles(user.id);
     } catch (error) {
-      console.error('Error uploading file:', error);
-      toast({
-        title: "Error",
-        description: "Failed to upload document",
-        variant: "destructive",
-      });
-    } finally {
-      setTimeout(() => {
-        setUploadProgress(prev => {
-          const newProgress = { ...prev };
-          delete newProgress[file.name];
-          return newProgress;
+      if (error instanceof Error && error.message === 'Upload cancelled') {
+        setUploadStatus(prev => ({ ...prev, [file.name]: 'cancelled' }));
+      } else {
+        console.error('Error uploading file:', error);
+        setUploadStatus(prev => ({ ...prev, [file.name]: 'error' }));
+        toast({
+          title: "Upload Failed",
+          description: `Failed to upload ${file.name}`,
+          variant: "destructive",
         });
-      }, 2000);
+      }
+    } finally {
+      // Clean up abort controller
+      setUploadAbortControllers(prev => {
+        const newControllers = new Map(prev);
+        newControllers.delete(file.name);
+        return newControllers;
+      });
+      // Don't auto-clear progress here, let the main upload handler manage it
     }
   };
 
@@ -595,15 +634,60 @@ const Notes = () => {
   const handleUploadWithCourse = async () => {
     if (pendingFiles.length === 0) return;
 
-    for (const file of pendingFiles) {
-      // Convert 'no-course' back to null for database storage
-      const courseValue = selectedCourse === 'no-course' ? null : selectedCourse;
-      await uploadFile(file, courseValue);
-    }
-
-    setPendingFiles([]);
-    setSelectedCourse('');
+    setIsUploading(true);
     setIsUploadDialogOpen(false);
+
+    // Create abort controllers for each file and set initial status
+    const controllers = new Map<string, AbortController>();
+    const initialStatus: Record<string, 'uploading'> = {};
+    pendingFiles.forEach(file => {
+      controllers.set(file.name, new AbortController());
+      initialStatus[file.name] = 'uploading';
+    });
+    setUploadAbortControllers(controllers);
+    setUploadStatus(initialStatus);
+
+    try {
+      for (const file of pendingFiles) {
+        const abortController = controllers.get(file.name);
+        if (abortController?.signal.aborted) break;
+
+        // Convert 'no-course' back to null for database storage
+        const courseValue = selectedCourse === 'no-course' ? null : selectedCourse;
+        await uploadFile(file, courseValue, abortController);
+      }
+    } finally {
+      setIsUploading(false);
+      setPendingFiles([]);
+      setSelectedCourse('');
+      setUploadAbortControllers(new Map());
+
+      // Clear progress and status after a delay
+      setTimeout(() => {
+        setUploadProgress({});
+        setUploadStatus({});
+      }, 3000);
+    }
+  };
+
+  const cancelAllUploads = () => {
+    // Abort all ongoing uploads
+    uploadAbortControllers.forEach(controller => {
+      controller.abort();
+    });
+
+    // Clear progress and reset state
+    setUploadProgress({});
+    setIsUploading(false);
+    setUploadAbortControllers(new Map());
+    setUploadStatus({});
+  };
+
+  const cancelSingleUpload = (fileName: string) => {
+    const controller = uploadAbortControllers.get(fileName);
+    if (controller) {
+      controller.abort();
+    }
   };
 
   const handleDragOver = (event: React.DragEvent) => {
@@ -1191,7 +1275,7 @@ const Notes = () => {
                   value={editingFile.newTag}
                   onChange={(e) => setEditingFile(prev => ({ ...prev, newTag: e.target.value }))}
                   placeholder="Add a tag..."
-                  onKeyPress={(e) => e.key === 'Enter' && addFileTag()}
+                  onKeyDown={(e) => e.key === 'Enter' && addFileTag()}
                 />
                 <Button onClick={addFileTag} variant="outline">Add Tag</Button>
               </div>
@@ -1225,6 +1309,82 @@ const Notes = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Upload Progress Dialog */}
+      {isUploading && (
+        <div className="fixed bottom-4 right-4 bg-background border rounded-lg shadow-lg p-4 min-w-80">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold">Uploading Files</h3>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={cancelAllUploads}
+              className="text-destructive hover:text-destructive"
+            >
+              Cancel All
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {Object.entries(uploadProgress).map(([fileName, progress]) => {
+              const status = uploadStatus[fileName] || 'uploading';
+              const getStatusColor = () => {
+                switch (status) {
+                  case 'completed': return 'bg-green-500';
+                  case 'cancelled': return 'bg-gray-400';
+                  case 'error': return 'bg-red-500';
+                  default: return 'bg-primary';
+                }
+              };
+              const getStatusText = () => {
+                switch (status) {
+                  case 'completed': return 'Completed';
+                  case 'cancelled': return 'Cancelled';
+                  case 'error': return 'Failed';
+                  default: return `${progress}%`;
+                }
+              };
+
+              return (
+                <div key={fileName} className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="truncate max-w-48">{fileName}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={status === 'cancelled' ? 'text-muted-foreground' : status === 'error' ? 'text-destructive' : status === 'completed' ? 'text-green-600' : ''}>
+                        {getStatusText()}
+                      </span>
+                      {status === 'uploading' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => cancelSingleUpload(fileName)}
+                          className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                        >
+                          ×
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="w-full bg-secondary rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all duration-300 ${getStatusColor()}`}
+                      style={{ width: status === 'cancelled' ? '100%' : `${progress}%` }}
+                    />
+                  </div>
+                  {status === 'cancelled' && (
+                    <div className="text-xs text-muted-foreground">Upload was cancelled</div>
+                  )}
+                  {status === 'error' && (
+                    <div className="text-xs text-destructive">Upload failed</div>
+                  )}
+                  {status === 'completed' && (
+                    <div className="text-xs text-green-600">Upload completed successfully</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

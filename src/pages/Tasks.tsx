@@ -39,8 +39,17 @@ const Tasks = () => {
   const [selectedSubject, setSelectedSubject] = useState('All');
   const [selectedPriority, setSelectedPriority] = useState('All');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [newTask, setNewTask] = useState({
+    title: '',
+    description: '',
+    subject: '',
+    priority: 'medium' as Task['priority'],
+    dueDate: ''
+  });
+  const [editingTask, setEditingTask] = useState({
     title: '',
     description: '',
     subject: '',
@@ -150,9 +159,16 @@ const Tasks = () => {
     return matchesSearch && matchesSubject && matchesPriority;
   });
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const tasksByStatus = {
-    pending: filteredTasks.filter(task => task.status === 'pending'),
-    'in-progress': filteredTasks.filter(task => task.status === 'in-progress'),
+    overdue: filteredTasks.filter(task => {
+      const dueDate = new Date(task.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+      return dueDate < today && task.status !== 'completed';
+    }),
+    pending: filteredTasks.filter(task => task.status !== 'completed'),
     completed: filteredTasks.filter(task => task.status === 'completed')
   };
 
@@ -172,15 +188,22 @@ const Tasks = () => {
     }
   };
 
+  const isTaskOverdue = (task: Task) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = new Date(task.dueDate);
+    dueDate.setHours(0, 0, 0, 0);
+    return dueDate < today && task.status !== 'completed';
+  };
+
   const toggleTaskStatus = async (taskId: string) => {
     if (!user) return;
 
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    const statusOrder: Task['status'][] = ['pending', 'in-progress', 'completed'];
-    const currentIndex = statusOrder.indexOf(task.status);
-    const nextStatus = statusOrder[(currentIndex + 1) % statusOrder.length];
+    // Simple toggle: pending <-> completed (skip in-progress)
+    const nextStatus = task.status === 'completed' ? 'pending' : 'completed';
 
     try {
       const { error } = await supabase
@@ -295,6 +318,70 @@ const Tasks = () => {
     }
   };
 
+  const openEditTask = (task: Task) => {
+    setEditingTask({
+      title: task.title,
+      description: task.description,
+      subject: task.subject,
+      priority: task.priority,
+      dueDate: task.dueDate
+    });
+    setEditingTaskId(task.id);
+    setIsEditDialogOpen(true);
+  };
+
+  const updateTask = async () => {
+    if (!editingTask.title || !editingTask.subject || !editingTask.dueDate || !user || !editingTaskId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({
+          title: editingTask.title,
+          description: editingTask.description,
+          subject: editingTask.subject,
+          priority: editingTask.priority,
+          due_date: editingTask.dueDate
+        })
+        .eq('id', editingTaskId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        toast({
+          title: "Error updating task",
+          description: error.message,
+          variant: "destructive"
+        });
+      } else {
+        const updatedTask: Task = {
+          id: data.id,
+          title: data.title,
+          description: data.description || '',
+          subject: data.subject,
+          status: data.status as Task['status'],
+          priority: data.priority as Task['priority'],
+          dueDate: data.due_date,
+          createdAt: new Date(data.created_at).toISOString().split('T')[0]
+        };
+
+        setTasks(prev => prev.map(task =>
+          task.id === editingTaskId ? updatedTask : task
+        ));
+        setEditingTask({ title: '', description: '', subject: '', priority: 'medium', dueDate: '' });
+        setEditingTaskId(null);
+        setIsEditDialogOpen(false);
+        toast({
+          title: "Task updated",
+          description: "Your task has been successfully updated.",
+        });
+      }
+    } catch (error) {
+      console.error('Error updating task:', error);
+    }
+  };
+
   const TaskCard = ({ task }: { task: Task }) => (
     <Card className="mb-4">
       <CardContent className="p-4">
@@ -314,10 +401,12 @@ const Tasks = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 ml-4">
-            <Button variant="ghost" size="sm" onClick={() => toggleTaskStatus(task.id)}>
-              <CheckCircle className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm">
+            {!isTaskOverdue(task) && (
+              <Button variant="ghost" size="sm" onClick={() => toggleTaskStatus(task.id)}>
+                <CheckCircle className="h-4 w-4" />
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => openEditTask(task)}>
               <Edit className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="sm" onClick={() => deleteTask(task.id)}>
@@ -431,6 +520,74 @@ const Tasks = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Edit Task Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Task</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-title">Title</Label>
+                <Input
+                  id="edit-title"
+                  value={editingTask.title}
+                  onChange={(e) => setEditingTask(prev => ({ ...prev, title: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  value={editingTask.description}
+                  onChange={(e) => setEditingTask(prev => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-subject">Subject</Label>
+                <Select value={editingTask.subject} onValueChange={(value) => setEditingTask(prev => ({ ...prev, subject: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select subject" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subjects.slice(1).map(subject => (
+                      <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit-priority">Priority</Label>
+                <Select value={editingTask.priority} onValueChange={(value: Task['priority']) => setEditingTask(prev => ({ ...prev, priority: value }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit-dueDate">Due Date</Label>
+                <Input
+                  id="edit-dueDate"
+                  type="date"
+                  value={editingTask.dueDate}
+                  onChange={(e) => setEditingTask(prev => ({ ...prev, dueDate: e.target.value }))}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={updateTask}>Update Task</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Tabs defaultValue="list" className="space-y-6">
@@ -441,62 +598,62 @@ const Tasks = () => {
 
         <TabsContent value="list">
           <div className="flex gap-4 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search tasks..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {subjects.map(subject => (
-              <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={selectedPriority} onValueChange={setSelectedPriority}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {priorities.map(priority => (
-              <SelectItem key={priority} value={priority}>
-                {priority === 'All' ? 'All Priorities' : priority.charAt(0).toUpperCase() + priority.slice(1)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search tasks..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {subjects.map(subject => (
+                  <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedPriority} onValueChange={setSelectedPriority}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {priorities.map(priority => (
+                  <SelectItem key={priority} value={priority}>
+                    {priority === 'All' ? 'All Priorities' : priority.charAt(0).toUpperCase() + priority.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-      <Tabs defaultValue="all" className="w-full">
-        <TabsList>
-          <TabsTrigger value="all">All ({filteredTasks.length})</TabsTrigger>
-          <TabsTrigger value="pending">Pending ({tasksByStatus.pending.length})</TabsTrigger>
-          <TabsTrigger value="in-progress">In Progress ({tasksByStatus['in-progress'].length})</TabsTrigger>
-          <TabsTrigger value="completed">Completed ({tasksByStatus.completed.length})</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="all">
-          {filteredTasks.map(task => <TaskCard key={task.id} task={task} />)}
-        </TabsContent>
+          <Tabs defaultValue="all" className="w-full">
+            <TabsList>
+              <TabsTrigger value="all">All ({filteredTasks.length})</TabsTrigger>
+              <TabsTrigger value="pending">Pending ({tasksByStatus.pending.length})</TabsTrigger>
+              <TabsTrigger value="completed">Completed ({tasksByStatus.completed.length})</TabsTrigger>
+              <TabsTrigger value="overdue">Overdue ({tasksByStatus.overdue.length})</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="all">
+              {filteredTasks.map(task => <TaskCard key={task.id} task={task} />)}
+            </TabsContent>
 
-        <TabsContent value="pending">
-          {tasksByStatus.pending.map(task => <TaskCard key={task.id} task={task} />)}
-        </TabsContent>
+            <TabsContent value="overdue">
+              {tasksByStatus.overdue.map(task => <TaskCard key={task.id} task={task} />)}
+            </TabsContent>
 
-        <TabsContent value="in-progress">
-          {tasksByStatus['in-progress'].map(task => <TaskCard key={task.id} task={task} />)}
-        </TabsContent>
+            <TabsContent value="pending">
+              {tasksByStatus.pending.map(task => <TaskCard key={task.id} task={task} />)}
+            </TabsContent>
 
-        <TabsContent value="completed">
-          {tasksByStatus.completed.map(task => <TaskCard key={task.id} task={task} />)}
-        </TabsContent>
+            <TabsContent value="completed">
+              {tasksByStatus.completed.map(task => <TaskCard key={task.id} task={task} />)}
+            </TabsContent>
           </Tabs>
         </TabsContent>
 

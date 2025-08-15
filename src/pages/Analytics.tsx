@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfWeek, endOfWeek, subDays, differenceInDays, isAfter, isBefore } from "date-fns";
-import { Plus, BookOpen, AlertTriangle, TrendingUp, Clock } from "lucide-react";
+import { Plus, BookOpen, AlertTriangle, TrendingUp, Clock, Edit, Trash2 } from "lucide-react";
 
 interface StudySession {
   id: string;
@@ -39,6 +39,9 @@ const Analytics = () => {
   const [weeklyGoal, setWeeklyGoal] = useState<number>(40);
   const [loading, setLoading] = useState(true);
   const [isSessionDialogOpen, setIsSessionDialogOpen] = useState(false);
+  const [isEditingSession, setIsEditingSession] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [timePeriod, setTimePeriod] = useState<string>('month');
   const [newSession, setNewSession] = useState({
     subject: '',
     duration_minutes: '',
@@ -52,13 +55,13 @@ const Analytics = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Fetch study sessions for the last 30 days
-        const thirtyDaysAgo = format(subDays(new Date(), 30), 'yyyy-MM-dd');
+        // Fetch study sessions for the last year (we'll filter client-side based on selected period)
+        const oneYearAgo = format(subDays(new Date(), 365), 'yyyy-MM-dd');
         const { data: sessions } = await supabase
           .from('study_sessions')
           .select('*')
           .eq('user_id', user.id)
-          .gte('session_date', thirtyDaysAgo)
+          .gte('session_date', oneYearAgo)
           .order('session_date', { ascending: true });
 
         // Fetch all tasks
@@ -98,6 +101,27 @@ const Analytics = () => {
     fetchData();
   }, []);
 
+  const openSessionEditor = (session?: StudySession) => {
+    if (session) {
+      setNewSession({
+        subject: session.subject,
+        duration_minutes: session.duration_minutes.toString(),
+        session_date: session.session_date
+      });
+      setIsEditingSession(true);
+      setEditingSessionId(session.id);
+    } else {
+      setNewSession({
+        subject: '',
+        duration_minutes: '',
+        session_date: format(new Date(), 'yyyy-MM-dd')
+      });
+      setIsEditingSession(false);
+      setEditingSessionId(null);
+    }
+    setIsSessionDialogOpen(true);
+  };
+
   const createStudySession = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -112,14 +136,95 @@ const Analytics = () => {
         return;
       }
 
+      if (isEditingSession && editingSessionId) {
+        // Update existing session
+        const { error } = await supabase
+          .from('study_sessions')
+          .update({
+            subject: newSession.subject,
+            duration_minutes: parseInt(newSession.duration_minutes),
+            session_date: newSession.session_date
+          })
+          .eq('id', editingSessionId)
+          .eq('user_id', user.id);
+
+        if (error) {
+          toast({
+            title: "Error",
+            description: error.message,
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Success",
+            description: "Study session updated successfully"
+          });
+        }
+      } else {
+        // Create new session
+        const { error } = await supabase
+          .from('study_sessions')
+          .insert({
+            user_id: user.id,
+            subject: newSession.subject,
+            duration_minutes: parseInt(newSession.duration_minutes),
+            session_date: newSession.session_date
+          });
+
+        if (error) {
+          toast({
+            title: "Error",
+            description: error.message,
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Success",
+            description: "Study session created successfully"
+          });
+        }
+      }
+
+      // Reset form and close dialog
+      setNewSession({
+        subject: '',
+        duration_minutes: '',
+        session_date: format(new Date(), 'yyyy-MM-dd')
+      });
+      setIsSessionDialogOpen(false);
+      setIsEditingSession(false);
+      setEditingSessionId(null);
+
+      // Refresh data
+      const oneYearAgo = format(subDays(new Date(), 365), 'yyyy-MM-dd');
+      const { data: sessions } = await supabase
+        .from('study_sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('session_date', oneYearAgo)
+        .order('session_date', { ascending: true });
+
+      setStudySessions(sessions || []);
+    } catch (error) {
+      console.error('Error saving study session:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save study session",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const deleteStudySession = async (sessionId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       const { error } = await supabase
         .from('study_sessions')
-        .insert({
-          user_id: user.id,
-          subject: newSession.subject,
-          duration_minutes: parseInt(newSession.duration_minutes),
-          session_date: newSession.session_date
-        });
+        .delete()
+        .eq('id', sessionId)
+        .eq('user_id', user.id);
 
       if (error) {
         toast({
@@ -130,39 +235,85 @@ const Analytics = () => {
       } else {
         toast({
           title: "Success",
-          description: "Study session created successfully"
+          description: "Study session deleted successfully"
         });
-
-        // Reset form
-        setNewSession({
-          subject: '',
-          duration_minutes: '',
-          session_date: format(new Date(), 'yyyy-MM-dd')
-        });
-        setIsSessionDialogOpen(false);
 
         // Refresh data
-        const thirtyDaysAgo = format(subDays(new Date(), 30), 'yyyy-MM-dd');
+        const oneYearAgo = format(subDays(new Date(), 365), 'yyyy-MM-dd');
         const { data: sessions } = await supabase
           .from('study_sessions')
           .select('*')
           .eq('user_id', user.id)
-          .gte('session_date', thirtyDaysAgo)
+          .gte('session_date', oneYearAgo)
           .order('session_date', { ascending: true });
 
         setStudySessions(sessions || []);
       }
     } catch (error) {
-      console.error('Error creating study session:', error);
+      console.error('Error deleting study session:', error);
       toast({
         title: "Error",
-        description: "Failed to create study session",
+        description: "Failed to delete study session",
         variant: "destructive"
       });
     }
   };
 
-  // Calculate analytics data - filter by user courses if available
+  // Helper function to get date range based on selected time period
+  const getDateRange = () => {
+    const now = new Date();
+    let startDate: Date;
+    
+    switch (timePeriod) {
+      case 'week':
+        startDate = subDays(now, 7);
+        break;
+      case 'month':
+        startDate = subDays(now, 30);
+        break;
+      case '3months':
+        startDate = subDays(now, 90);
+        break;
+      case '6months':
+        startDate = subDays(now, 180);
+        break;
+      case 'year':
+        startDate = subDays(now, 365);
+        break;
+      default:
+        startDate = subDays(now, 30);
+    }
+    
+    return { startDate, endDate: now };
+  };
+
+  const { startDate, endDate } = getDateRange();
+  
+  // Helper function to get time period display name
+  const getTimePeriodName = () => {
+    switch (timePeriod) {
+      case 'week': return 'This Week';
+      case 'month': return 'This Month';
+      case '3months': return 'Last 3 Months';
+      case '6months': return 'Last 6 Months';
+      case 'year': return 'This Year';
+      default: return 'This Month';
+    }
+  };
+
+  // Filter study sessions by selected time period for specific metrics
+  const filteredStudySessions = studySessions.filter(session => {
+    const sessionDate = new Date(session.session_date);
+    return sessionDate >= startDate && sessionDate <= endDate;
+  });
+
+  // Filter tasks by selected time period for specific metrics
+  const filteredTasks = tasks.filter(task => {
+    const taskDate = new Date(task.due_date);
+    return taskDate >= startDate && taskDate <= endDate;
+  });
+
+  // Calculate analytics data - filter by user courses (use all data for main charts)
   const timePerSubjectData = studySessions.reduce((acc, session) => {
     // Only include sessions for user's courses, or all if no courses defined
     if (userCourses.length === 0 || userCourses.includes(session.subject)) {
@@ -212,6 +363,16 @@ const Analytics = () => {
     { name: 'Overdue', value: Math.round((overdueTasks / totalTasks) * 100), color: 'hsl(var(--chart-3))' }
   ] : [];
 
+  // Calculate filtered metrics for time period specific cards
+  const filteredTotalHours = filteredStudySessions.reduce((sum, session) => sum + session.duration_minutes / 60, 0);
+  const filteredCompletedTasks = filteredTasks.filter(task => task.status === 'completed').length;
+  const filteredTotalTasks = filteredTasks.length;
+  const filteredTaskCompletionRate = filteredTotalTasks > 0 ? Math.round((filteredCompletedTasks / filteredTotalTasks) * 100) : 0;
+  
+  // Calculate days in selected period for daily average
+  const daysInPeriod = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  const dailyAverageHours = daysInPeriod > 0 ? filteredTotalHours / daysInPeriod : 0;
+
   const totalStudyHours = timePerSubjectData.reduce((sum, item) => sum + item.hours, 0);
   const actualHours = dailyStudyTimeData.reduce((sum, item) => sum + item.hours, 0);
   const goalCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
@@ -234,16 +395,32 @@ const Analytics = () => {
           <h1 className="text-3xl font-bold mb-2">Analytics Dashboard</h1>
           <p className="text-muted-foreground">Track your academic progress and study patterns</p>
         </div>
-        <Dialog open={isSessionDialogOpen} onOpenChange={setIsSessionDialogOpen}>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="time-period">Time Period:</Label>
+            <Select value={timePeriod} onValueChange={setTimePeriod}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">1 Week</SelectItem>
+                <SelectItem value="month">1 Month</SelectItem>
+                <SelectItem value="3months">3 Months</SelectItem>
+                <SelectItem value="6months">6 Months</SelectItem>
+                <SelectItem value="year">1 Year</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Dialog open={isSessionDialogOpen} onOpenChange={setIsSessionDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={() => openSessionEditor()}>
               <Plus className="h-4 w-4 mr-2" />
               Add Study Session
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create Study Session</DialogTitle>
+              <DialogTitle>{isEditingSession ? 'Edit Study Session' : 'Create Study Session'}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -297,7 +474,7 @@ const Analytics = () => {
               </div>
               <div className="flex gap-2 pt-4">
                 <Button onClick={createStudySession} className="flex-1">
-                  Create Session
+                  {isEditingSession ? 'Update Session' : 'Create Session'}
                 </Button>
                 <Button
                   variant="outline"
@@ -310,6 +487,7 @@ const Analytics = () => {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -329,8 +507,8 @@ const Analytics = () => {
             <CardTitle className="text-sm font-medium">Daily Average</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{(actualHours / 7).toFixed(1)}h</div>
-            <p className="text-xs text-muted-foreground">Per day</p>
+            <div className="text-2xl font-bold">{dailyAverageHours.toFixed(1)}h</div>
+            <p className="text-xs text-muted-foreground">{getTimePeriodName()}</p>
           </CardContent>
         </Card>
 
@@ -339,8 +517,8 @@ const Analytics = () => {
             <CardTitle className="text-sm font-medium">Tasks Completed</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{taskStatusData.length > 0 ? taskStatusData[0].value : 0}%</div>
-            <p className="text-xs text-muted-foreground">This week</p>
+            <div className="text-2xl font-bold">{filteredTaskCompletionRate}%</div>
+            <p className="text-xs text-muted-foreground">{getTimePeriodName()}</p>
           </CardContent>
         </Card>
 
@@ -492,7 +670,7 @@ const Analytics = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge 
+                    <Badge
                       variant={suggestion.priority === 'high' ? 'destructive' : suggestion.priority === 'medium' ? 'default' : 'secondary'}
                     >
                       {suggestion.priority} priority
@@ -526,7 +704,7 @@ const Analytics = () => {
                   const daysUntilDue = differenceInDays(dueDate, now);
                   let urgency = 'low';
                   let urgencyColor = 'secondary';
-                  
+
                   if (daysUntilDue < 0) {
                     urgency = 'overdue';
                     urgencyColor = 'destructive';
@@ -569,13 +747,13 @@ const Analytics = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={task.urgencyColor as any}>
-                      {task.urgency === 'overdue' 
+                      {task.urgency === 'overdue'
                         ? `${Math.abs(task.daysUntilDue)} days overdue`
-                        : task.daysUntilDue === 0 
-                        ? 'Due today'
-                        : task.daysUntilDue === 1
-                        ? 'Due tomorrow'
-                        : `${task.daysUntilDue} days left`
+                        : task.daysUntilDue === 0
+                          ? 'Due today'
+                          : task.daysUntilDue === 1
+                            ? 'Due tomorrow'
+                            : `${task.daysUntilDue} days left`
                       }
                     </Badge>
                     <Clock className="h-4 w-4 text-muted-foreground" />
@@ -619,6 +797,57 @@ const Analytics = () => {
                 <div className="text-2xl font-bold text-primary">{goalCompletionRate}%</div>
                 <p className="text-sm text-muted-foreground">Overall completion rate</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Study Sessions */}
+      <div className="mt-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              Recent Study Sessions
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">Manage your recent study sessions</p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {studySessions
+                .slice(-10) // Show last 10 sessions
+                .reverse() // Show most recent first
+                .map((session) => (
+                  <div key={session.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex-1">
+                      <div className="font-medium">{session.subject}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {(session.duration_minutes / 60).toFixed(1)}h • {format(new Date(session.session_date), 'MMM dd, yyyy')}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openSessionEditor(session)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteStudySession(session.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              {studySessions.length === 0 && (
+                <p className="text-muted-foreground text-center py-8">
+                  No study sessions found. Create your first session above!
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
