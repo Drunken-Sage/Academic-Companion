@@ -70,6 +70,9 @@ const Notes = () => {
     tags: [] as string[],
     newTag: ''
   });
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -204,8 +207,8 @@ const Notes = () => {
 
   const filteredNotes = notes.filter(note => {
     const matchesSearch = note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         note.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         note.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+      note.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      note.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesSubject = selectedSubject === 'All' || note.subject === selectedSubject;
 
     return matchesSearch && matchesSubject;
@@ -453,7 +456,7 @@ const Notes = () => {
     }));
   };
 
-  const uploadFile = async (file: File) => {
+  const uploadFile = async (file: File, course?: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
@@ -481,7 +484,8 @@ const Notes = () => {
           original_name: file.name,
           display_name: file.name,
           file_size: file.size,
-          mime_type: file.type || 'application/octet-stream'
+          mime_type: file.type || 'application/octet-stream',
+          course: course || null
         });
 
       if (dbError) throw dbError;
@@ -489,7 +493,7 @@ const Notes = () => {
       setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
       toast({
         title: "Success",
-        description: "Document uploaded successfully",
+        description: `Document uploaded successfully${course ? ` to ${course}` : ''}`,
       });
 
       // Refresh files list
@@ -548,14 +552,58 @@ const Notes = () => {
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = Array.from(event.target.files || []);
-    selectedFiles.forEach(uploadFile);
+    try {
+      const selectedFiles = Array.from(event.target.files || []);
+      if (selectedFiles.length > 0) {
+        setPendingFiles(selectedFiles);
+        // Safely set default course - use first non-"All" subject or 'no-course'
+        const defaultCourse = subjects.length > 1 ? subjects[1] : 'no-course';
+        setSelectedCourse(defaultCourse);
+        setIsUploadDialogOpen(true);
+      }
+    } catch (error) {
+      console.error('Error in handleFileSelect:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process file selection",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDrop = (event: React.DragEvent) => {
-    event.preventDefault();
-    const droppedFiles = Array.from(event.dataTransfer.files);
-    droppedFiles.forEach(uploadFile);
+    try {
+      event.preventDefault();
+      const droppedFiles = Array.from(event.dataTransfer.files);
+      if (droppedFiles.length > 0) {
+        setPendingFiles(droppedFiles);
+        // Safely set default course - use first non-"All" subject or 'no-course'
+        const defaultCourse = subjects.length > 1 ? subjects[1] : 'no-course';
+        setSelectedCourse(defaultCourse);
+        setIsUploadDialogOpen(true);
+      }
+    } catch (error) {
+      console.error('Error in handleDrop:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process dropped files",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUploadWithCourse = async () => {
+    if (pendingFiles.length === 0) return;
+
+    for (const file of pendingFiles) {
+      // Convert 'no-course' back to null for database storage
+      const courseValue = selectedCourse === 'no-course' ? null : selectedCourse;
+      await uploadFile(file, courseValue);
+    }
+
+    setPendingFiles([]);
+    setSelectedCourse('');
+    setIsUploadDialogOpen(false);
   };
 
   const handleDragOver = (event: React.DragEvent) => {
@@ -572,7 +620,7 @@ const Notes = () => {
 
   const filteredFiles = files.filter(file => {
     const matchesSearch = file.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         file.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+      file.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCourse = selectedSubject === 'All' || file.course === selectedSubject;
     return matchesSearch && matchesCourse;
   });
@@ -638,133 +686,132 @@ const Notes = () => {
         <TabsContent value="notes">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Notes List */}
-        <div className="lg:col-span-1">
-          <div className="space-y-4 mb-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search notes..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {subjects.map(subject => (
-                  <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-3 max-h-[600px] overflow-y-auto">
-            {filteredNotes.map(note => (
-              <Card
-                key={note.id}
-                className={`cursor-pointer transition-colors hover:bg-accent ${
-                  selectedNote?.id === note.id ? 'ring-2 ring-primary' : ''
-                }`}
-                onClick={() => openNote(note)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-semibold text-sm line-clamp-1">{note.title}</h3>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openEditor(note);
-                        }}
-                      >
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteNote(note.id);
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
-                    {note.content}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <Badge variant="outline" className="text-xs">{note.subject}</Badge>
-                    <span className="text-xs text-muted-foreground">{note.wordCount} words</span>
-                  </div>
-                  <div className="flex items-center gap-1 mt-2">
-                    <Clock className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">{note.updatedAt}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        {/* Note Viewer */}
-        <div className="lg:col-span-2">
-          {selectedNote ? (
-            <Card className="h-[600px]">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-xl">{selectedNote.title}</CardTitle>
-                    <div className="flex items-center gap-2 mt-2">
-                      <Badge variant="outline">{selectedNote.subject}</Badge>
-                      <span className="text-sm text-muted-foreground">
-                        {selectedNote.wordCount} words
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        Updated: {selectedNote.updatedAt}
-                      </span>
-                    </div>
-                  </div>
-                  <Button variant="outline" onClick={() => openEditor(selectedNote)}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
+            <div className="lg:col-span-1">
+              <div className="space-y-4 mb-6">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search notes..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
-                <div className="flex gap-1 mt-2">
-                  {selectedNote.tags.map(tag => (
-                    <Badge key={tag} variant="secondary" className="text-xs">
-                      <Tag className="h-3 w-3 mr-1" />
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </CardHeader>
-              <Separator />
-              <CardContent className="p-6">
-                <div className="prose prose-sm max-w-none">
-                  {selectedNote.content.split('\n').map((line, index) => (
-                    <p key={index} className="mb-3">
-                      {line || '\u00A0'}
-                    </p>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="h-[600px] flex items-center justify-center">
-              <div className="text-center">
-                <BookOpen className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-semibold mb-2">Select a note to view</h3>
-                <p className="text-muted-foreground">Choose a note from the list to read its content</p>
+                <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subjects.map(subject => (
+                      <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </Card>
-            )}
+
+              <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                {filteredNotes.map(note => (
+                  <Card
+                    key={note.id}
+                    className={`cursor-pointer transition-colors hover:bg-accent ${selectedNote?.id === note.id ? 'ring-2 ring-primary' : ''
+                      }`}
+                    onClick={() => openNote(note)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-semibold text-sm line-clamp-1">{note.title}</h3>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditor(note);
+                            }}
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteNote(note.id);
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
+                        {note.content}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline" className="text-xs">{note.subject}</Badge>
+                        <span className="text-xs text-muted-foreground">{note.wordCount} words</span>
+                      </div>
+                      <div className="flex items-center gap-1 mt-2">
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">{note.updatedAt}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* Note Viewer */}
+            <div className="lg:col-span-2">
+              {selectedNote ? (
+                <Card className="h-[600px]">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="text-xl">{selectedNote.title}</CardTitle>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="outline">{selectedNote.subject}</Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {selectedNote.wordCount} words
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            Updated: {selectedNote.updatedAt}
+                          </span>
+                        </div>
+                      </div>
+                      <Button variant="outline" onClick={() => openEditor(selectedNote)}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                    </div>
+                    <div className="flex gap-1 mt-2">
+                      {selectedNote.tags.map(tag => (
+                        <Badge key={tag} variant="secondary" className="text-xs">
+                          <Tag className="h-3 w-3 mr-1" />
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardHeader>
+                  <Separator />
+                  <CardContent className="p-6">
+                    <div className="prose prose-sm max-w-none">
+                      {selectedNote.content.split('\n').map((line, index) => (
+                        <p key={index} className="mb-3">
+                          {line || '\u00A0'}
+                        </p>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="h-[600px] flex items-center justify-center">
+                  <div className="text-center">
+                    <BookOpen className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-semibold mb-2">Select a note to view</h3>
+                    <p className="text-muted-foreground">Choose a note from the list to read its content</p>
+                  </div>
+                </Card>
+              )}
             </div>
           </div>
         </TabsContent>
@@ -796,7 +843,7 @@ const Notes = () => {
               </div>
 
               {/* Drop Zone */}
-              <Card 
+              <Card
                 className="mb-4 border-dashed border-2 hover:border-primary transition-colors cursor-pointer"
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
@@ -814,9 +861,8 @@ const Notes = () => {
                 {filteredFiles.map(file => (
                   <Card
                     key={file.id}
-                    className={`cursor-pointer transition-colors hover:bg-accent ${
-                      selectedFile?.id === file.id ? 'ring-2 ring-primary' : ''
-                    }`}
+                    className={`cursor-pointer transition-colors hover:bg-accent ${selectedFile?.id === file.id ? 'ring-2 ring-primary' : ''
+                      }`}
                     onClick={() => setSelectedFile(file)}
                   >
                     <CardContent className="p-4">
@@ -1046,6 +1092,63 @@ const Notes = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Upload Dialog */}
+      <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Documents</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-4">
+                You're about to upload {pendingFiles.length} file{pendingFiles.length !== 1 ? 's' : ''}:
+              </p>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {pendingFiles.map((file, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
+                    <span className="text-sm font-medium">{file.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {(file.size / 1024 / 1024).toFixed(2)} MB
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label>Course Category</Label>
+              <Select
+                value={selectedCourse}
+                onValueChange={setSelectedCourse}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a course (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no-course">No course</SelectItem>
+                  {subjects.slice(1).map(subject => (
+                    <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Categorizing by course helps organize your documents
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUploadWithCourse}>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload {pendingFiles.length} File{pendingFiles.length !== 1 ? 's' : ''}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* File Editor Dialog */}
       <Dialog open={isFileEditorOpen} onOpenChange={setIsFileEditorOpen}>
         <DialogContent className="max-w-2xl">
@@ -1073,7 +1176,7 @@ const Notes = () => {
                   <SelectValue placeholder="Select a course" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No course</SelectItem>
+                  <SelectItem value="no-course">No course</SelectItem>
                   {subjects.slice(1).map(subject => (
                     <SelectItem key={subject} value={subject}>{subject}</SelectItem>
                   ))}
