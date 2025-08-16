@@ -202,8 +202,21 @@ const Tasks = () => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    // Simple toggle: pending <-> completed (skip in-progress)
-    const nextStatus = task.status === 'completed' ? 'pending' : 'completed';
+    // Determine next status based on current status and due date
+    let nextStatus: Task['status'];
+    if (task.status === 'completed') {
+      // When unchecking a completed task, check if it's overdue
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dueDate = new Date(task.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+      
+      // If due date has passed, it should remain as pending (will show in overdue)
+      nextStatus = 'pending';
+    } else {
+      // When checking a pending/overdue task, mark as completed
+      nextStatus = 'completed';
+    }
 
     try {
       const { error } = await supabase
@@ -222,9 +235,18 @@ const Tasks = () => {
         setTasks(prev => prev.map(t =>
           t.id === taskId ? { ...t, status: nextStatus } : t
         ));
+        
+        // Show appropriate message based on whether task is overdue
+        const isOverdue = isTaskOverdue({ ...task, status: nextStatus });
+        const statusMessage = nextStatus === 'completed' 
+          ? 'completed' 
+          : isOverdue 
+            ? 'pending (overdue)' 
+            : 'pending';
+            
         toast({
           title: "Task updated",
-          description: `Task marked as ${nextStatus.replace('-', ' ')}.`,
+          description: `Task marked as ${statusMessage}.`,
         });
       }
     } catch (error) {
@@ -401,11 +423,9 @@ const Tasks = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 ml-4">
-            {!isTaskOverdue(task) && (
-              <Button variant="ghost" size="sm" onClick={() => toggleTaskStatus(task.id)}>
-                <CheckCircle className="h-4 w-4" />
-              </Button>
-            )}
+            <Button variant="ghost" size="sm" onClick={() => toggleTaskStatus(task.id)}>
+              <CheckCircle className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => openEditTask(task)}>
               <Edit className="h-4 w-4" />
             </Button>
